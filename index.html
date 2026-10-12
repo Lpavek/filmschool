@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="cs" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineMaster // Mapa a Osa Tvůrců</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cinema: {
+                            900: '#0a0a0a',
+                            800: '#141414',
+                            700: '#222222',
+                            600: '#333333',
+                            accent: '#d92525', // Cinematic red
+                            gold: '#d4af37'   // Oscar gold
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Vis-Timeline CSS & JS -->
+    <script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
+    <link href="https://unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
+
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #e5e5e5;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #141414; }
+        ::-webkit-scrollbar-thumb { background: #333333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d92525; }
+
+        /* Leaflet Dark Theme Adjustments */
+        .leaflet-container {
+            background: #1a1a1d !important;
+            font-family: 'Inter', sans-serif;
+        }
+        .leaflet-popup-content-wrapper {
+            background: #222222;
+            color: #e5e5e5;
+            border-radius: 8px;
+            border: 1px solid #333333;
+        }
+        .leaflet-popup-tip { background: #222222; }
+
+        /* Vis-Timeline Dark Theme Adjustments */
+        .vis-timeline {
+            border: none;
+            background: #141414;
+        }
+        .vis-item {
+            background-color: #222222;
+            border-color: #d92525;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .vis-item.vis-selected {
+            background-color: #d92525;
+            border-color: #ff4d4d;
+        }
+        .vis-time-axis .vis-text { color: #a3a3a3; }
+        .vis-time-axis .vis-grid.vis-minor { border-color: #333333; }
+        .vis-time-axis .vis-grid.vis-major { border-color: #555555; }
+        .vis-labelset .vis-label {
+            color: #d4af37;
+            border-bottom: 1px solid #333333;
+            font-weight: 600;
+        }
+        .vis-panel.vis-bottom, .vis-panel.vis-center, .vis-panel.vis-left, .vis-panel.vis-right, .vis-panel.vis-top {
+            border-color: #333333;
+        }
+
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(20, 20, 20, 0.75);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <header class="glass z-50 flex-shrink-0 shadow-lg">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded bg-cinema-accent flex items-center justify-center shadow-lg shadow-cinema-accent/30">
+                    <i class="fa-solid fa-film text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-serif font-semibold text-white tracking-wide">Cine<span class="text-cinema-accent">Master</span></h1>
+                    <p class="text-[10px] text-gray-400 uppercase tracking-widest">Studentská filmová mapa</p>
+                </div>
+            </div>
+
+            <div class="flex-1 max-w-4xl flex items-center justify-end space-x-3">
+                <div class="relative flex-1 max-w-md">
+                    <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <input type="text" id="searchInput" placeholder="Hledej lokálně nebo přidejte z celého světa (Nominatim API)..." class="w-full bg-cinema-800 border border-cinema-700 text-sm rounded-full pl-9 pr-4 py-2 focus:outline-none focus:border-cinema-accent focus:ring-1 focus:ring-cinema-accent transition-all text-white placeholder-gray-500">
+                </div>
+                
+                <select id="roleFilter" class="bg-cinema-800 border border-cinema-700 text-sm rounded-full px-3 py-2 focus:outline-none focus:border-cinema-accent text-white cursor-pointer hidden sm:block">
+                    <option value="all">Všechny profese</option>
+                    <option value="režisér">Režisér</option>
+                    <option value="scenárista">Scenárista</option>
+                    <option value="kameraman">Kameraman</option>
+                </select>
