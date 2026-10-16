@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cinematic Atlas</title>
+    <title>Film School Atlas</title>
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>">
@@ -18,7 +18,7 @@
 <body>
 
     <header>
-        <h2 class="neon-text">CINEMATIC ATLAS</h2>
+        <h2 class="neon-text">FILM SCHOOL ATLAS</h2>
         <div class="controls">
             <div class="view-toggles">
                 <button id="btn-map" class="active" onclick="switchView('map')">MAP</button>
@@ -41,7 +41,7 @@
                 <div id="timeline-container"></div>
             </div>
 
-            <!-- Atmosphere Glow Intensity Slider (Moved to Bottom-Left Corner) -->
+            <!-- Atmosphere Glow Intensity Slider (Centered horizontally at the bottom) -->
             <div class="glow-control">
                 <span class="glow-label">GLOW</span>
                 <input type="range" id="glowSlider" min="0" max="100" value="50" oninput="updateGlobeGlow(this.value)">
@@ -82,9 +82,9 @@
                             <div class="profile-info">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <h4 id="entity-name" class="neon-text"></h4>
-                                    <div id="entity-actions"></div>
+                                    <div id="entity-actions" class="profile-actions-bar"></div>
                                 </div>
-                                <div class="bio-text" id="entity-details"></div>
+                                <div class="bio-text-details" id="entity-details"></div>
                                 <div class="bio-text" id="entity-bio" style="margin-top: 10px;"></div>
                             </div>
                         </div>
@@ -130,12 +130,13 @@
                     <h3 style="margin-bottom:0;">MY REPERTOIRE</h3>
                     <div class="repertoire-filters">
                         <select id="filter-tab-sort" onchange="changeTabSortMode(this.value)" title="Sort Repertoire Categories">
-                            <option value="recent">TABS: RECENT</option>
+                            <option value="recent">TABS: RECENT ADDED</option>
                             <option value="count">TABS: COUNT</option>
                             <option value="default">TABS: DEFAULT</option>
                         </select>
                         <select id="filter-visibility" onchange="renderRepertoire()">
                             <option value="main">ACTIVE</option>
+                            <option value="wishlist">WISHLIST</option>
                             <option value="hidden">HIDDEN</option>
                             <option value="all">ALL</option>
                         </select>
