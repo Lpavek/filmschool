@@ -32,7 +32,7 @@
     </header>
 
     <div id="main-content">
-        <!-- Visual Panel (Left) -->
+        <!-- Visual Panel (Left - Default 60%) -->
         <div id="visual-panel">
             <div id="map"></div>
             <div id="timeline-view">
@@ -40,10 +40,10 @@
                 <div id="timeline-container"></div>
             </div>
             
-            <!-- Left Sub-Inspector Panel -->
+            <!-- Left Sub-Inspector Panel (Full Creator Details) -->
             <div id="sub-inspector-panel" class="sub-panel" style="display: none;">
                 <div class="sub-panel-header">
-                    <span class="sub-panel-title neon-text" id="sub-panel-title">ACTIVE DETAIL</span>
+                    <span class="sub-panel-title neon-text" id="sub-panel-title">FULL CREATOR ANALYSIS</span>
                     <button class="close-btn" onclick="closeSubInspector()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
@@ -55,51 +55,63 @@
         <!-- Draggable Resizer Bar -->
         <div id="resizer"></div>
 
-        <!-- Data Panel (Right) -->
+        <!-- Data Panel (Right - Default 40%) -->
         <div id="data-panel">
-            <!-- Active Analysis Section -->
-            <div class="section" id="active-analysis-section">
-                <h3 id="analysis-section-title">ACTIVE ANALYSIS</h3>
-                <div id="results-content">
-                    <p style="color: #666; font-size: 11px;">Search for a creator or movie to start analysis.</p>
-                </div>
+            
+            <!-- Top Scrollable Content Container -->
+            <div id="data-scroll-container">
+                
+                <!-- Active Analysis Section -->
+                <div class="section" id="active-analysis-section">
+                    <h3 id="analysis-section-title">ACTIVE ANALYSIS</h3>
+                    <div id="results-content">
+                        <p style="color: #64748b; font-size: 11px;">Search for a creator or movie to start analysis.</p>
+                    </div>
 
-                <!-- Entity Profile -->
-                <div id="entity-profile" style="display: none;">
-                    <div class="profile-header">
-                        <img id="entity-photo" src="" alt="Profile">
-                        <div class="profile-info">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <h4 id="entity-name" class="neon-text"></h4>
-                                <div id="entity-actions"></div>
+                    <!-- Entity Profile -->
+                    <div id="entity-profile" style="display: none;">
+                        <div class="profile-header">
+                            <img id="entity-photo" src="" alt="Profile">
+                            <div class="profile-info">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <h4 id="entity-name" class="neon-text"></h4>
+                                    <div id="entity-actions"></div>
+                                </div>
+                                <div class="bio-text" id="entity-details"></div>
+                                <div class="bio-text" id="entity-bio" style="margin-top: 10px;"></div>
                             </div>
-                            <div class="bio-text" id="entity-details"></div>
-                            <div class="bio-text" id="entity-bio" style="margin-top: 10px;"></div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Cast & Crew Breakdown -->
-            <div class="section" id="creators-section" style="display:none;">
-                <h3>CAST & CREW</h3>
-                <div id="creators-breakdown" class="creators-grid"></div>
-            </div>
-
-            <!-- Filmography List -->
-            <div class="section" id="filmography-section" style="display:none;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <h3 id="filmography-title" style="margin-bottom:0;">FILMOGRAPHY</h3>
-                    <button class="sort-toggle-btn" id="filmography-sort-btn" onclick="toggleFilmographySort()" title="Toggle Order">
-                        <span>NEWEST FIRST</span> ↕
-                    </button>
+                <!-- Cast & Crew Breakdown -->
+                <div class="section" id="creators-section" style="display:none;">
+                    <h3>CAST & CREW</h3>
+                    <div id="creators-breakdown" class="creators-grid"></div>
                 </div>
-                <div id="filmography-list" class="list-container"></div>
+
+                <!-- Commercial & Financial Performance Section -->
+                <div class="section" id="financials-section" style="display:none;">
+                    <h3>COMMERCIAL PERFORMANCE</h3>
+                    <div id="financials-content"></div>
+                </div>
+
+                <!-- Filmography List -->
+                <div class="section" id="filmography-section" style="display:none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h3 id="filmography-title" style="margin-bottom:0;">FILMOGRAPHY</h3>
+                        <button class="sort-toggle-btn" id="filmography-sort-btn" onclick="toggleFilmographySort()" title="Toggle Order">
+                            <span>NEWEST FIRST</span> ↕
+                        </button>
+                    </div>
+                    <div id="filmography-list" class="list-container"></div>
+                </div>
+
             </div>
 
-            <!-- Repertoire Section -->
+            <!-- Locked Bottom Repertoire Section -->
             <div class="section" id="repertoire-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <h3 style="margin-bottom:0;">MY REPERTOIRE</h3>
                     <div class="repertoire-filters">
                         <select id="filter-visibility" onchange="renderRepertoire()">
@@ -115,7 +127,7 @@
                     </div>
                 </div>
 
-                <!-- Sleek Repertoire Category Tabs -->
+                <!-- Repertoire Category Tabs -->
                 <div class="rep-tabs-wrapper">
                     <div class="rep-tabs" id="rep-tabs">
                         <button class="rep-tab-btn active" data-cat="directors" onclick="setRepertoireTab('directors')">DIRECTING</button>
@@ -131,10 +143,11 @@
 
                 <div id="repertoire-list" class="repertoire-container"></div>
             </div>
+
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- External Libraries -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
     <script src="app.js"></script>
