@@ -10,9 +10,10 @@ let isRotating = true;
 let mapIdleTimer;
 let activeRepertoireTab = 'directors';
 let filmographySortOrder = 'desc';
+let showUpcoming = false; // Toggle state for planned / future movies
 
 // Dynamic Tab Sorting State
-let tabSortMode = localStorage.getItem('cinematicTabSortMode') || 'recent'; // 'recent', 'count', 'default'
+let tabSortMode = localStorage.getItem('cinematicTabSortMode') || 'recent';
 let categoryMeta = JSON.parse(localStorage.getItem('cinematicCategoryMeta')) || {
     directors: { lastUpdated: 8 },
     writers: { lastUpdated: 7 },
@@ -37,7 +38,7 @@ const SVG_ICONS = {
 };
 
 // Repertoire storage
-let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v6')) || [];
+let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v7')) || [];
 
 function initApp() {
     // 1. Initialize Mapbox Globe
@@ -76,11 +77,9 @@ function initApp() {
         }
     });
 
-    // Set initial select dropdown value
     const tabSortSelect = document.getElementById('filter-tab-sort');
     if (tabSortSelect) tabSortSelect.value = tabSortMode;
 
-    // 3. Initialize Resizers & Tabs
     initResizers();
     initTabsScroll();
 
@@ -111,7 +110,7 @@ function rotateGlobe() {
     }
 }
 
-// --- DRAGGABLE RESIZERS (VERTICAL & HORIZONTAL) ---
+// --- DRAGGABLE RESIZERS ---
 function initResizers() {
     const resizerV = document.getElementById('resizer');
     const rightPanel = document.getElementById('data-panel');
@@ -166,7 +165,7 @@ function initResizers() {
     });
 }
 
-// --- DYNAMIC REPERTOIRE TABS RENDER & SORTING ---
+// --- REPERTOIRE TABS ---
 function touchCategory(cat) {
     if (!categoryMeta[cat]) categoryMeta[cat] = {};
     categoryMeta[cat].lastUpdated = Date.now();
@@ -232,7 +231,6 @@ function initTabsScroll() {
         const now = Date.now();
         if (now - lastTabWheelTime < 150) return;
 
-        // Get active rendered order of tabs
         const activeButtons = Array.from(tabsContainer.querySelectorAll('.rep-tab-btn'));
         const activeCats = activeButtons.map(b => b.dataset.cat);
         
@@ -320,11 +318,8 @@ async function analyzePerson(id) {
     const credRes = await fetch(`https://api.themoviedb.org/3/person/${id}/movie_credits?api_key=${TMDB_API_KEY}`);
     const credits = await credRes.json();
 
-    let works = [];
-    if (person.known_for_department === 'Acting') { works = credits.cast; } 
-    else { works = credits.crew.filter(c => c.department === person.known_for_department); }
-    
-    works = Array.from(new Map(works.filter(w => w.release_date).map(item => [item.id, item])).values());
+    let rawWorks = person.known_for_department === 'Acting' ? credits.cast : credits.crew.filter(c => c.department === person.known_for_department);
+    let works = Array.from(new Map(rawWorks.map(item => [item.id, item])).values());
 
     currentEntity = { type: 'person', id: person.id, name: person.name, job: person.known_for_department, works: works };
 
@@ -419,7 +414,7 @@ async function fetchAndPopulateDirectorTimeline(director) {
     try {
         const credRes = await fetch(`https://api.themoviedb.org/3/person/${director.id}/movie_credits?api_key=${TMDB_API_KEY}`);
         const credits = await credRes.json();
-        let works = credits.crew.filter(c => c.job === 'Director' && c.release_date);
+        let works = credits.crew.filter(c => c.job === 'Director');
         
         document.getElementById('timeline-title').innerText = `DIRECTOR TIMELINE: ${director.name.toUpperCase()}`;
         populateTimeline(works, director.name);
@@ -434,7 +429,7 @@ function renderMovieProfile(movie, mediaType) {
     imgEl.src = movie.poster_path ? `https://image.tmdb.org/t/p/w200${movie.poster_path}` : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
     
     const releaseDate = movie.release_date || movie.first_air_date || '';
-    const year = releaseDate ? releaseDate.split('-')[0] : '';
+    const year = releaseDate ? releaseDate.split('-')[0] : 'UPCOMING';
     const genres = movie.genres ? movie.genres.map(g => g.name).join(', ') : '';
     const runtime = movie.runtime || (movie.episode_run_time ? movie.episode_run_time[0] : null);
     
@@ -471,7 +466,7 @@ function renderMovieProfile(movie, mediaType) {
     actionsDiv.appendChild(repBtn);
 }
 
-// --- COMMERCIAL PERFORMANCE & FINANCIAL GRAPHS ---
+// --- COMMERCIAL PERFORMANCE ---
 function renderFinancials(movie) {
     const sec = document.getElementById('financials-section');
     const container = document.getElementById('financials-content');
@@ -643,9 +638,9 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
         const credRes = await fetch(`https://api.themoviedb.org/3/person/${personId}/movie_credits?api_key=${TMDB_API_KEY}`);
         const credits = await credRes.json();
 
-        let works = credits.crew.length > 0 ? credits.crew : credits.cast;
-        works = Array.from(new Map(works.filter(w => w.release_date).map(item => [item.id, item])).values())
-                .sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
+        let rawWorks = credits.crew.length > 0 ? credits.crew : credits.cast;
+        let works = Array.from(new Map(rawWorks.map(item => [item.id, item])).values())
+                .sort((a, b) => new Date(b.release_date || '2099-12-31') - new Date(a.release_date || '2099-12-31'));
 
         let html = `
             <div style="display:flex; gap:16px; margin-bottom:15px; border-bottom:1px solid #1e1e2e; padding-bottom:15px;">
@@ -671,17 +666,24 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
             <div class="list-container">
         `;
 
+        const currentYear = new Date().getFullYear();
+
         works.forEach(w => {
             const isHighlighted = w.id === highlightMovieId;
-            const year = w.release_date ? w.release_date.split('-')[0] : '????';
-            html += `
-                <div class="film-item ${isHighlighted ? 'highlighted-film' : ''}">
-                    <div class="film-info">
-                        <span class="film-year" onclick="jumpToYear('${w.release_date}')">${year}</span>
-                        <span class="film-title" onclick="analyzeMovie(${w.id})">${w.title} ${isHighlighted ? '◄ (ACTIVE)' : ''}</span>
+            const releaseYear = w.release_date ? parseInt(w.release_date.split('-')[0]) : null;
+            const isUpcoming = !w.release_date || releaseYear > currentYear;
+            const yearStr = releaseYear ? releaseYear : 'TBA';
+
+            if (!isUpcoming || showUpcoming) {
+                html += `
+                    <div class="film-item ${isHighlighted ? 'highlighted-film' : ''} ${isUpcoming ? 'upcoming-film' : ''}">
+                        <div class="film-info">
+                            <span class="film-year" onclick="jumpToYear('${w.release_date}')">${yearStr}</span>
+                            <span class="film-title" onclick="analyzeMovie(${w.id})">${w.title} ${isUpcoming ? '<span class="upcoming-badge">UPCOMING</span>' : ''} ${isHighlighted ? '◄ (ACTIVE)' : ''}</span>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
         });
 
         html += `</div>`;
@@ -694,6 +696,21 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
 
 function closeSubInspector() {
     document.getElementById('sub-inspector-panel').style.display = 'none';
+}
+
+// --- TOGGLE UPCOMING MOVIES ---
+function toggleUpcoming() {
+    showUpcoming = !showUpcoming;
+    const btn = document.getElementById('upcoming-toggle-btn');
+    if (btn) {
+        btn.classList.toggle('active', showUpcoming);
+        btn.innerHTML = `🔮 <span>${showUpcoming ? 'HIDE FUTURE' : 'SHOW FUTURE'}</span>`;
+    }
+
+    if (currentEntity && currentEntity.works) {
+        renderFilmographyList(currentEntity.works);
+        populateTimeline(currentEntity.works, currentEntity.name);
+    }
 }
 
 // --- RENDER FILMOGRAPHY LIST ---
@@ -711,9 +728,19 @@ function renderFilmographyList(works) {
     document.getElementById('filmography-section').style.display = 'block';
     listDiv.innerHTML = '';
 
-    const sortedWorks = [...works].sort((a, b) => {
-        const dateA = new Date(a.release_date || 0);
-        const dateB = new Date(b.release_date || 0);
+    const currentYear = new Date().getFullYear();
+
+    // Filter released vs upcoming movies
+    let filteredWorks = works.filter(m => {
+        if (showUpcoming) return true;
+        if (!m.release_date) return false;
+        const rYear = parseInt(m.release_date.split('-')[0]);
+        return rYear <= currentYear;
+    });
+
+    const sortedWorks = [...filteredWorks].sort((a, b) => {
+        const dateA = new Date(a.release_date || '2099-12-31');
+        const dateB = new Date(b.release_date || '2099-12-31');
         return filmographySortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
 
@@ -723,24 +750,27 @@ function renderFilmographyList(works) {
     const wishArray = repData ? (repData.wish || []) : [];
 
     sortedWorks.forEach(m => {
-        const year = m.release_date ? m.release_date.split('-')[0] : '????';
+        const releaseYear = m.release_date ? parseInt(m.release_date.split('-')[0]) : null;
+        const isUpcoming = !m.release_date || releaseYear > currentYear;
+        const yearStr = releaseYear ? releaseYear : 'TBA';
+
         const isSeen = seenArray.includes(m.id);
         const isWish = wishArray.includes(m.id);
 
         const div = document.createElement('div');
-        div.className = 'film-item';
+        div.className = `film-item ${isUpcoming ? 'upcoming-film' : ''}`;
 
         const infoDiv = document.createElement('div');
         infoDiv.className = 'film-info';
         
         const yearSpan = document.createElement('span');
         yearSpan.className = 'film-year';
-        yearSpan.textContent = year;
+        yearSpan.textContent = yearStr;
         yearSpan.onclick = () => jumpToYear(m.release_date);
 
         const titleSpan = document.createElement('span');
         titleSpan.className = 'film-title';
-        titleSpan.textContent = m.title;
+        titleSpan.innerHTML = `${m.title} ${isUpcoming ? '<span class="upcoming-badge">UPCOMING</span>' : ''}`;
         titleSpan.onclick = () => analyzeMovie(m.id);
 
         infoDiv.appendChild(yearSpan);
@@ -865,7 +895,7 @@ function toggleRepertoireAttr(id, cat, attr) {
 }
 
 function saveRepertoire() {
-    localStorage.setItem('cinematicRepertoirePRO_v6', JSON.stringify(repertoire));
+    localStorage.setItem('cinematicRepertoirePRO_v7', JSON.stringify(repertoire));
     renderRepertoire();
 }
 
@@ -883,7 +913,6 @@ function calculateScoreColor(seen, total) {
         const t = (ratio - 0.5) / 0.5;
         const r = Math.round(249 - 233 * t);
         const g = Math.round(115 + (70) * t);
-        const b = Math.round(22 + 107 * t);
         return `rgb(${r}, ${g}, ${b})`;
     }
 }
@@ -976,9 +1005,21 @@ function jumpToYear(dateString) {
 
 function populateTimeline(works, groupName) {
     timelineItems.clear();
+    const currentYear = new Date().getFullYear();
+
     works.forEach((m, idx) => {
-        if (m.release_date) {
-            timelineItems.add({ id: idx, movieId: m.id, content: m.title, start: m.release_date, className: 'film-node' });
+        const releaseYear = m.release_date ? parseInt(m.release_date.split('-')[0]) : null;
+        const isUpcoming = !m.release_date || releaseYear > currentYear;
+
+        if (!isUpcoming || showUpcoming) {
+            const startDate = m.release_date || `${currentYear + 2}-01-01`;
+            timelineItems.add({
+                id: idx,
+                movieId: m.id,
+                content: `${m.title} ${isUpcoming ? '🔮' : ''}`,
+                start: startDate,
+                className: isUpcoming ? 'upcoming-node' : 'film-node'
+            });
         }
     });
     timeline.fit();
@@ -987,7 +1028,7 @@ function populateTimeline(works, groupName) {
 async function geocodeAndZoom(locationString, title) {
     try {
         const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationString)}.json?access_token=${mapboxgl.accessToken}`);
-        const data = await res.json();
+        data = await res.json();
         if (data.features && data.features.length > 0) {
             const center = data.features[0].center;
             switchView('map');
