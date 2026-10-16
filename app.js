@@ -9,7 +9,10 @@ let currentEntity = null; // Currently inspected movie or person
 let isRotating = true;
 let mapIdleTimer;
 let activeRepertoireTab = 'directors';
-let filmographySortOrder = 'desc'; // 'desc' = Newest First, 'asc' = Oldest First
+let filmographySortOrder = 'desc';
+
+const REPERTOIRE_CATEGORIES = ['directors', 'writers', 'cinematographers', 'musicians', 'editors', 'actors', 'movies', 'series'];
+let lastTabWheelTime = 0;
 
 // SVG Icons
 const SVG_ICONS = {
@@ -21,7 +24,7 @@ const SVG_ICONS = {
 };
 
 // Repertoire storage
-let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v3')) || [];
+let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v4')) || [];
 
 function initApp() {
     // 1. Initialize Mapbox Globe
@@ -33,14 +36,14 @@ function initApp() {
         projection: 'globe'
     });
 
-    // Balanced Atmosphere Glow (Soft atmospheric ambient glow)
+    // Balanced Atmosphere Glow (Soft ambient halo between white and dark)
     map.on('style.load', () => {
         map.setFog({
-            'range': [0.8, 8],
-            'color': 'rgba(15, 23, 42, 0.8)',
-            'high-color': 'rgba(148, 163, 184, 0.35)',
-            'space-color': '#030712',
-            'horizon-blend': 0.15
+            'range': [0.8, 10],
+            'color': 'rgba(20, 25, 45, 0.75)',
+            'high-color': 'rgba(200, 210, 240, 0.45)',
+            'space-color': '#030509',
+            'horizon-blend': 0.1
         });
     });
 
@@ -70,7 +73,7 @@ function initApp() {
     // 3. Initialize Panel Resizer
     initResizer();
 
-    // 4. Initialize Tabs Mouse Wheel Scrolling
+    // 4. Initialize Wheel Tab Switcher
     initTabsScroll();
 
     renderRepertoire();
@@ -101,7 +104,7 @@ function initResizer() {
         if (!isDragging) return;
         const containerWidth = document.getElementById('main-content').offsetWidth;
         const newRightWidth = containerWidth - e.clientX;
-        if (newRightWidth > 300 && newRightWidth < containerWidth - 300) {
+        if (newRightWidth > 320 && newRightWidth < containerWidth - 320) {
             rightPanel.style.width = `${newRightWidth}px`;
             if (map) map.resize();
         }
@@ -117,15 +120,23 @@ function initResizer() {
     });
 }
 
-// --- REPERTOIRE TABS MOUSE WHEEL SCROLLING ---
+// --- REPERTOIRE TABS AUTOMATIC WHEEL SWITCHING ---
 function initTabsScroll() {
     const tabsContainer = document.getElementById('rep-tabs');
     if (!tabsContainer) return;
 
     tabsContainer.addEventListener('wheel', (e) => {
-        if (e.deltaY !== 0) {
-            e.preventDefault();
-            tabsContainer.scrollLeft += e.deltaY;
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastTabWheelTime < 150) return; // Debounce 150ms
+
+        let idx = REPERTOIRE_CATEGORIES.indexOf(activeRepertoireTab);
+        if (e.deltaY > 0 && idx < REPERTOIRE_CATEGORIES.length - 1) {
+            setRepertoireTab(REPERTOIRE_CATEGORIES[idx + 1]);
+            lastTabWheelTime = now;
+        } else if (e.deltaY < 0 && idx > 0) {
+            setRepertoireTab(REPERTOIRE_CATEGORIES[idx - 1]);
+            lastTabWheelTime = now;
         }
     });
 }
@@ -157,6 +168,7 @@ async function searchAction() {
     document.getElementById('entity-profile').style.display = 'none';
     document.getElementById('filmography-section').style.display = 'none';
     document.getElementById('creators-section').style.display = 'none';
+    document.getElementById('financials-section').style.display = 'none';
 
     try {
         const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
@@ -213,10 +225,10 @@ async function analyzePerson(id) {
     autoSwitchRepertoireTab(person.known_for_department);
 
     document.getElementById('creators-section').style.display = 'none';
+    document.getElementById('financials-section').style.display = 'none';
     renderPersonProfile(person, works.length);
     renderFilmographyList(works);
     
-    // Update Timeline for Person
     document.getElementById('timeline-title').innerText = `TIMELINE: ${person.name.toUpperCase()}`;
     populateTimeline(works, person.name);
     
@@ -269,19 +281,19 @@ async function analyzeMovie(id, mediaType = 'movie') {
     const credRes = await fetch(`https://api.themoviedb.org/3/${endpoint}/${id}/credits?api_key=${TMDB_API_KEY}`);
     const credits = await credRes.json();
 
-    currentEntity = { type: mediaType, id: movie.id, title: movie.title || movie.name, credits: credits };
+    currentEntity = { type: mediaType, id: movie.id, title: movie.title || movie.name, credits: credits, rawData: movie };
 
     setRepertoireTab(mediaType === 'tv' ? 'series' : 'movies');
 
     document.getElementById('filmography-section').style.display = 'none';
     renderMovieProfile(movie, mediaType);
     renderCreatorsBreakdown(credits);
+    renderFinancials(movie);
     
     if (movie.production_countries && movie.production_countries.length > 0) {
         movie.production_countries.forEach(c => geocodeAndAddMarker(c.name, movie.title || movie.name));
     }
 
-    // Load full director's timeline automatically for this movie!
     const director = credits.crew.find(c => c.job === 'Director');
     if (director) {
         fetchAndPopulateDirectorTimeline(director);
@@ -353,7 +365,80 @@ function renderMovieProfile(movie, mediaType) {
     actionsDiv.appendChild(repBtn);
 }
 
-// --- CAST & CREW BREAKDOWN (Typography-focused, Max 4 shown, Clean Expand) ---
+// --- COMMERCIAL PERFORMANCE & FINANCIAL GRAPHS ---
+function renderFinancials(movie) {
+    const sec = document.getElementById('financials-section');
+    const container = document.getElementById('financials-content');
+    
+    const budget = movie.budget || 0;
+    const revenue = movie.revenue || 0;
+
+    if (budget === 0 && revenue === 0) {
+        sec.style.display = 'none';
+        return;
+    }
+
+    sec.style.display = 'block';
+
+    const profit = revenue - budget;
+    const isHit = profit >= 0;
+    const roi = budget > 0 ? (revenue / budget).toFixed(2) : 'N/A';
+
+    const fmtUSD = (val) => '$' + val.toLocaleString('en-US');
+
+    // Calculate graph bar percentages
+    const maxVal = Math.max(budget, revenue);
+    const budgetPct = maxVal > 0 ? Math.round((budget / maxVal) * 100) : 0;
+    const revenuePct = maxVal > 0 ? Math.round((revenue / maxVal) * 100) : 0;
+
+    container.innerHTML = `
+        <div class="fin-grid">
+            <div class="fin-box">
+                <div class="fin-label">BUDGET</div>
+                <div class="fin-val">${budget > 0 ? fmtUSD(budget) : 'N/A'}</div>
+            </div>
+            <div class="fin-box">
+                <div class="fin-label">WORLDWIDE GROSS</div>
+                <div class="fin-val">${revenue > 0 ? fmtUSD(revenue) : 'N/A'}</div>
+            </div>
+            <div class="fin-box">
+                <div class="fin-label">NET PROFIT / LOSS</div>
+                <div class="fin-val" style="color: ${isHit ? 'var(--neon-green)' : '#ef4444'};">${profit !== 0 ? fmtUSD(profit) : 'N/A'}</div>
+            </div>
+            <div class="fin-box">
+                <div class="fin-label">COMMERCIAL STATUS</div>
+                <div>
+                    <span class="fin-status-tag ${isHit ? 'fin-status-hit' : 'fin-status-flop'}">
+                        ${isHit ? 'BLOCKBUSTER / PROFITABLE (' + roi + 'x)' : 'FINANCIAL LOSS'}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="fin-bar-container">
+            <div class="fin-bar-row">
+                <div class="fin-bar-header">
+                    <span>BUDGET</span>
+                    <span>${budget > 0 ? fmtUSD(budget) : 'N/A'}</span>
+                </div>
+                <div class="fin-bar-bg">
+                    <div class="fin-bar-fill-budget" style="width: ${budgetPct}%;"></div>
+                </div>
+            </div>
+            <div class="fin-bar-row">
+                <div class="fin-bar-header">
+                    <span>WORLDWIDE REVENUE</span>
+                    <span>${revenue > 0 ? fmtUSD(revenue) : 'N/A'}</span>
+                </div>
+                <div class="fin-bar-bg">
+                    <div class="fin-bar-fill-revenue" style="width: ${revenuePct}%;"></div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// --- CAST & CREW BREAKDOWN ---
 function renderCreatorsBreakdown(credits) {
     const section = document.getElementById('creators-section');
     const container = document.getElementById('creators-breakdown');
@@ -439,12 +524,12 @@ function renderCreatorsBreakdown(credits) {
     });
 }
 
-// --- LEFT SUB-INSPECTOR PANEL ---
+// --- LEFT SUB-INSPECTOR PANEL (FULL CREATOR ANALYSIS) ---
 async function openSubInspectorPerson(personId, highlightMovieId) {
     const subPanel = document.getElementById('sub-inspector-panel');
     const container = document.getElementById('sub-panel-content');
     subPanel.style.display = 'block';
-    container.innerHTML = `<p class="neon-text">LOADING CREATOR DETAILS...</p>`;
+    container.innerHTML = `<p class="neon-text">LOADING CREATOR ANALYSIS...</p>`;
 
     try {
         const personRes = await fetch(`https://api.themoviedb.org/3/person/${personId}?api_key=${TMDB_API_KEY}`);
@@ -458,16 +543,26 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
                 .sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
 
         let html = `
-            <div style="display:flex; gap:15px; margin-bottom:15px;">
-                <img src="${person.profile_path ? 'https://image.tmdb.org/t/p/w200' + person.profile_path : ''}" style="width:80px; height:120px; object-fit:cover; border:1px solid var(--neon-blue); border-radius:3px;">
-                <div>
-                    <h4 class="neon-text" style="margin:0 0 5px 0; font-size:15px;">${person.name}</h4>
-                    <div style="font-size:10px; color:var(--neon-orange); font-weight:700;">${person.known_for_department || ''}</div>
-                    <div style="font-size:11px; color:#94a3b8; margin-top:5px;">Born: ${person.birthday || 'Unknown'}</div>
-                    <button class="action-btn" style="margin-top:8px; padding:4px 10px; font-size:10px;" onclick="analyzePerson(${person.id})">FULL ANALYSIS ➔</button>
+            <div style="display:flex; gap:16px; margin-bottom:15px; border-bottom:1px solid #1e1e2e; padding-bottom:15px;">
+                <img src="${person.profile_path ? 'https://image.tmdb.org/t/p/w200' + person.profile_path : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='}" style="width:100px; height:145px; object-fit:cover; border:1px solid var(--neon-blue); border-radius:3px;">
+                <div style="flex:1;">
+                    <h4 class="neon-text" style="margin:0 0 6px 0; font-size:16px;">${person.name}</h4>
+                    <div style="font-size:11px; color:var(--neon-orange); font-weight:800; margin-bottom:6px;">${person.known_for_department || ''}</div>
+                    <div style="font-size:11px; color:#cbd5e1; line-height:1.4;">
+                        ${person.birthday ? '<div><strong style="color:#fff;">Born:</strong> ' + person.birthday + '</div>' : ''}
+                        ${person.place_of_birth ? '<div><strong style="color:#fff;">Place:</strong> ' + person.place_of_birth + '</div>' : ''}
+                        <div><strong style="color:#fff;">Total Works:</strong> ${works.length}</div>
+                    </div>
+                    <button class="action-btn" style="margin-top:10px; padding:4px 10px; font-size:10px;" onclick="analyzePerson(${person.id})">INSPECT IN MAIN PANEL ➔</button>
                 </div>
             </div>
-            <h4 style="color:var(--neon-orange); border-bottom:1px solid #1e1e2e; padding-bottom:4px; font-size:11px; font-weight:800; letter-spacing:1px;">FILMOGRAPHY (ACTIVE HIGHLIGHT)</h4>
+            
+            <div style="margin-bottom:15px;">
+                <h5 style="color:var(--neon-orange); margin:0 0 5px 0; font-size:11px; font-weight:800; letter-spacing:1px;">BIOGRAPHY</h5>
+                <div style="font-size:11px; color:#94a3b8; line-height:1.45; max-height:120px; overflow-y:auto;">${person.biography || 'No biography available.'}</div>
+            </div>
+
+            <h4 style="color:var(--neon-orange); border-bottom:1px solid #1e1e2e; padding-bottom:4px; font-size:11px; font-weight:800; letter-spacing:1px;">FULL FILMOGRAPHY (${works.length})</h4>
             <div class="list-container">
         `;
 
@@ -488,7 +583,7 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
         container.innerHTML = html;
 
     } catch (e) {
-        container.innerHTML = `<p style="color:red;font-size:11px;">Failed to load creator details.</p>`;
+        container.innerHTML = `<p style="color:red;font-size:11px;">Failed to load creator analysis.</p>`;
     }
 }
 
@@ -496,7 +591,7 @@ function closeSubInspector() {
     document.getElementById('sub-inspector-panel').style.display = 'none';
 }
 
-// --- RENDER FILMOGRAPHY LIST (DEFAULT: NEWEST FIRST) ---
+// --- RENDER FILMOGRAPHY LIST ---
 function toggleFilmographySort() {
     filmographySortOrder = filmographySortOrder === 'desc' ? 'asc' : 'desc';
     const btn = document.getElementById('filmography-sort-btn');
@@ -511,7 +606,6 @@ function renderFilmographyList(works) {
     document.getElementById('filmography-section').style.display = 'block';
     listDiv.innerHTML = '';
 
-    // Sort according to active order
     const sortedWorks = [...works].sort((a, b) => {
         const dateA = new Date(a.release_date || 0);
         const dateB = new Date(b.release_date || 0);
@@ -571,7 +665,7 @@ function renderFilmographyList(works) {
     });
 }
 
-// --- REPERTOIRE TABS MANAGEMENT ---
+// --- REPERTOIRE MANAGEMENT ---
 function setRepertoireTab(cat) {
     activeRepertoireTab = cat;
     document.querySelectorAll('.rep-tab-btn').forEach(btn => {
@@ -634,13 +728,11 @@ function forceAddToRepertoire() {
             renderPersonProfile(currentEntity, currentEntity.works.length);
         }
     } else {
-        // Adding a Movie automatically syncs movie to Movies Repertoire AND syncs Director to Directing Repertoire!
         const cat = currentEntity.type === 'tv' ? 'series' : 'movies';
         if (!repertoire.find(r => r.id === currentEntity.id && r.category === cat)) {
             repertoire.push({ id: currentEntity.id, name: currentEntity.title, category: cat, total: 1, seen: [currentEntity.id], wish: [], pinned: false, hidden: false });
         }
 
-        // Auto sync Director if credits available
         if (currentEntity.credits && currentEntity.credits.crew) {
             const dir = currentEntity.credits.crew.find(c => c.job === 'Director');
             if (dir && !repertoire.find(r => r.id === dir.id && r.category === 'directors')) {
@@ -662,11 +754,10 @@ function toggleRepertoireAttr(id, cat, attr) {
 }
 
 function saveRepertoire() {
-    localStorage.setItem('cinematicRepertoirePRO_v3', JSON.stringify(repertoire));
+    localStorage.setItem('cinematicRepertoirePRO_v4', JSON.stringify(repertoire));
     renderRepertoire();
 }
 
-// Color gradient: Purple (#5b21b6) -> Orange (#f97316) -> Green (#10b981)
 function calculateScoreColor(seen, total) {
     if (total === 0) return '#5b21b6';
     const ratio = Math.min(seen / total, 1);
