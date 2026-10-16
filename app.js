@@ -1,16 +1,17 @@
 const TMDB_API_KEY = '8818385dc34c1143c1b2589f2d36f790';
 mapboxgl.accessToken = 'pk.eyJ1IjoibHVxcWV5IiwiYSI6ImNtdmF4MXg3OTA4c3oyeXI0aTgzNnM5MW4ifQ.ZoG892NR3JW26wh-ZGdPRg';
 
-// Globální proměnné a stavy
+// Global Variables
 let map, timeline;
 let timelineItems = new vis.DataSet([]);
 let currentMarkers = [];
-let currentEntity = null; // Hlavní analyzovaná entita
+let currentEntity = null; // Currently inspected movie or person
 let isRotating = true;
 let mapIdleTimer;
 let activeRepertoireTab = 'directors';
+let filmographySortOrder = 'desc'; // 'desc' = Newest First, 'asc' = Oldest First
 
-// SVG ikony
+// SVG Icons
 const SVG_ICONS = {
     check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
     circle: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>`,
@@ -19,11 +20,11 @@ const SVG_ICONS = {
     link: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`
 };
 
-// Struktura repertoáru z localStorage
-let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v2')) || [];
+// Repertoire storage
+let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v3')) || [];
 
 function initApp() {
-    // 1. Inicializace 3D Glóbusu Mapbox
+    // 1. Initialize Mapbox Globe
     map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/dark-v11',
@@ -32,18 +33,18 @@ function initApp() {
         projection: 'globe'
     });
 
-    // Vyvážení atmosféry zeměkoule (odstranění přesvětlené bílé aury)
+    // Balanced Atmosphere Glow (Soft atmospheric ambient glow)
     map.on('style.load', () => {
         map.setFog({
-            'range': [0.5, 10],
-            'color': '#050814',
-            'high-color': '#0a1128',
-            'space-color': '#000000',
-            'horizon-blend': 0.05
+            'range': [0.8, 8],
+            'color': 'rgba(15, 23, 42, 0.8)',
+            'high-color': 'rgba(148, 163, 184, 0.35)',
+            'space-color': '#030712',
+            'horizon-blend': 0.15
         });
     });
 
-    // Pomalá rotace při nečinnosti
+    // Idle rotation logic
     const resetIdle = () => {
         isRotating = false;
         clearTimeout(mapIdleTimer);
@@ -53,7 +54,7 @@ function initApp() {
     map.on('moveend', () => { if (isRotating) rotateGlobe(); });
     rotateGlobe();
 
-    // 2. Inicializace Timeline
+    // 2. Initialize Timeline
     timeline = new vis.Timeline(document.getElementById('timeline-container'), timelineItems, {
         start: '1970-01-01', end: '2030-01-01', height: '100%', zoomMin: 1000 * 60 * 60 * 24 * 365,
     });
@@ -66,8 +67,11 @@ function initApp() {
         }
     });
 
-    // 3. Inicializace Resizeru (posuvná delička)
+    // 3. Initialize Panel Resizer
     initResizer();
+
+    // 4. Initialize Tabs Mouse Wheel Scrolling
+    initTabsScroll();
 
     renderRepertoire();
 }
@@ -81,14 +85,13 @@ function rotateGlobe() {
     }
 }
 
-// --- POSUVNÁ DELIČKA PANELŮ ---
+// --- DRAGGABLE RESIZER ---
 function initResizer() {
     const resizer = document.getElementById('resizer');
-    const leftPanel = document.getElementById('visual-panel');
     const rightPanel = document.getElementById('data-panel');
     let isDragging = false;
 
-    resizer.addEventListener('mousedown', (e) => {
+    resizer.addEventListener('mousedown', () => {
         isDragging = true;
         resizer.classList.add('dragging');
         document.body.style.cursor = 'col-resize';
@@ -98,7 +101,7 @@ function initResizer() {
         if (!isDragging) return;
         const containerWidth = document.getElementById('main-content').offsetWidth;
         const newRightWidth = containerWidth - e.clientX;
-        if (newRightWidth > 280 && newRightWidth < containerWidth - 300) {
+        if (newRightWidth > 300 && newRightWidth < containerWidth - 300) {
             rightPanel.style.width = `${newRightWidth}px`;
             if (map) map.resize();
         }
@@ -114,7 +117,20 @@ function initResizer() {
     });
 }
 
-// --- PŘEPÍNÁNÍ POHLEDŮ ---
+// --- REPERTOIRE TABS MOUSE WHEEL SCROLLING ---
+function initTabsScroll() {
+    const tabsContainer = document.getElementById('rep-tabs');
+    if (!tabsContainer) return;
+
+    tabsContainer.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) {
+            e.preventDefault();
+            tabsContainer.scrollLeft += e.deltaY;
+        }
+    });
+}
+
+// --- VIEW SWITCHER ---
 function switchView(view) {
     document.querySelectorAll('.view-toggles button').forEach(b => b.classList.remove('active'));
     document.getElementById(`btn-${view}`).classList.add('active');
@@ -128,7 +144,7 @@ function switchView(view) {
     if (view === 'timeline' && timeline) timeline.redraw();
 }
 
-// --- VYHLEDÁVÁNÍ ---
+// --- SEARCH ACTION ---
 function handleEnter(e) { if (e.key === 'Enter') searchAction(); }
 
 async function searchAction() {
@@ -137,7 +153,7 @@ async function searchAction() {
 
     closeSubInspector();
     const resDiv = document.getElementById('results-content');
-    resDiv.innerHTML = `<p class="neon-text">Vyhledávám v databázi...</p>`;
+    resDiv.innerHTML = `<p class="neon-text">SEARCHING DATABASE...</p>`;
     document.getElementById('entity-profile').style.display = 'none';
     document.getElementById('filmography-section').style.display = 'none';
     document.getElementById('creators-section').style.display = 'none';
@@ -151,18 +167,18 @@ async function searchAction() {
             resDiv.innerHTML = '';
             filtered.forEach(item => {
                 const title = item.title || item.name;
-                let typeLabel = '🎬 Film';
-                if (item.media_type === 'person') typeLabel = '👤 Osoba';
-                if (item.media_type === 'tv') typeLabel = '📺 Seriál';
+                let typeLabel = 'MOVIE';
+                if (item.media_type === 'person') typeLabel = 'CREATOR';
+                if (item.media_type === 'tv') typeLabel = 'SERIES';
                 
                 const div = document.createElement('div');
                 div.className = 'film-item';
                 div.innerHTML = `
-                    <div class="film-info"><strong class="neon-text">${title}</strong> <span style="font-size:10px;color:#666;">(${typeLabel})</span></div>
+                    <div class="film-info"><strong class="neon-text">${title}</strong> <span style="font-size:10px;color:#64748b;">(${typeLabel})</span></div>
                 `;
                 const btn = document.createElement('button');
                 btn.className = 'action-btn';
-                btn.textContent = 'Analyzovat';
+                btn.textContent = 'ANALYZE';
                 btn.addEventListener('click', () => {
                     if (item.media_type === 'person') analyzePerson(item.id);
                     else analyzeMovie(item.id, item.media_type === 'tv' ? 'tv' : 'movie');
@@ -170,11 +186,11 @@ async function searchAction() {
                 div.appendChild(btn);
                 resDiv.appendChild(div);
             });
-        } else { resDiv.innerHTML = `<p>Žádné výsledky nenalezeny.</p>`; }
-    } catch (err) { resDiv.innerHTML = `<p style="color:red;">Chyba připojení.</p>`; }
+        } else { resDiv.innerHTML = `<p style="font-size:11px;color:#64748b;">No results found.</p>`; }
+    } catch (err) { resDiv.innerHTML = `<p style="color:red;font-size:11px;">Connection error.</p>`; }
 }
 
-// --- ANALÝZA OSOBY (Režisér, Herec, Kamera...) ---
+// --- PERSON ANALYSIS ---
 async function analyzePerson(id) {
     document.getElementById('results-content').innerHTML = '';
     clearVisuals();
@@ -190,17 +206,18 @@ async function analyzePerson(id) {
     if (person.known_for_department === 'Acting') { works = credits.cast; } 
     else { works = credits.crew.filter(c => c.department === person.known_for_department); }
     
-    works = Array.from(new Map(works.filter(w => w.release_date).map(item => [item.id, item])).values())
-            .sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
+    works = Array.from(new Map(works.filter(w => w.release_date).map(item => [item.id, item])).values());
 
     currentEntity = { type: 'person', id: person.id, name: person.name, job: person.known_for_department, works: works };
 
-    // Automaticky přepneme záložku repertoáru podle profese
     autoSwitchRepertoireTab(person.known_for_department);
 
     document.getElementById('creators-section').style.display = 'none';
     renderPersonProfile(person, works.length);
     renderFilmographyList(works);
+    
+    // Update Timeline for Person
+    document.getElementById('timeline-title').innerText = `TIMELINE: ${person.name.toUpperCase()}`;
     populateTimeline(works, person.name);
     
     if (person.place_of_birth) geocodeAndZoom(person.place_of_birth, person.name);
@@ -215,11 +232,11 @@ function renderPersonProfile(person, totalFilms) {
     imgEl.src = person.profile_path ? `https://image.tmdb.org/t/p/w200${person.profile_path}` : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
     
     let detailsHtml = '';
-    if (person.known_for_department) detailsHtml += `<div><span class="label">Profese:</span> ${person.known_for_department}</div>`;
-    if (person.birthday) detailsHtml += `<div><span class="label">Narození:</span> ${person.birthday}</div>`;
-    if (person.deathday) detailsHtml += `<div><span class="label">Úmrtí:</span> ${person.deathday}</div>`;
-    if (person.place_of_birth) detailsHtml += `<div><span class="label">Místo:</span> <span class="interactive-link" onclick="geocodeAndZoom('${person.place_of_birth.replace(/'/g, "\\'")}', '${person.name.replace(/'/g, "\\'")}')">${person.place_of_birth}</span></div>`;
-    if (totalFilms > 0) detailsHtml += `<div><span class="label">Celkem děl:</span> ${totalFilms}</div>`;
+    if (person.known_for_department) detailsHtml += `<div><span class="label">Profession:</span> ${person.known_for_department}</div>`;
+    if (person.birthday) detailsHtml += `<div><span class="label">Born:</span> ${person.birthday}</div>`;
+    if (person.deathday) detailsHtml += `<div><span class="label">Died:</span> ${person.deathday}</div>`;
+    if (person.place_of_birth) detailsHtml += `<div><span class="label">Place:</span> <span class="interactive-link" onclick="geocodeAndZoom('${person.place_of_birth.replace(/'/g, "\\'")}', '${person.name.replace(/'/g, "\\'")}')">${person.place_of_birth}</span></div>`;
+    if (totalFilms > 0) detailsHtml += `<div><span class="label">Total Works:</span> ${totalFilms}</div>`;
     
     document.getElementById('entity-details').innerHTML = detailsHtml;
     document.getElementById('entity-bio').innerText = person.biography || '';
@@ -232,14 +249,14 @@ function renderPersonProfile(person, totalFilms) {
     actBtn.style.width = 'auto';
     actBtn.style.padding = '0 8px';
     actBtn.style.fontSize = '10px';
-    actBtn.innerHTML = `${SVG_ICONS.pin} <span style="margin-left:4px;">${existing ? 'V repertoáru' : 'Přidat do repertoáru'}</span>`;
+    actBtn.innerHTML = `${SVG_ICONS.pin} <span style="margin-left:4px;">${existing ? 'IN REPERTOIRE' : 'ADD TO REPERTOIRE'}</span>`;
     actBtn.onclick = () => forceAddToRepertoire();
 
     document.getElementById('entity-actions').innerHTML = '';
     document.getElementById('entity-actions').appendChild(actBtn);
 }
 
-// --- ANALÝZA FILMU / SERIÁLU ---
+// --- MOVIE / SERIES ANALYSIS ---
 async function analyzeMovie(id, mediaType = 'movie') {
     document.getElementById('results-content').innerHTML = '';
     clearVisuals();
@@ -252,9 +269,8 @@ async function analyzeMovie(id, mediaType = 'movie') {
     const credRes = await fetch(`https://api.themoviedb.org/3/${endpoint}/${id}/credits?api_key=${TMDB_API_KEY}`);
     const credits = await credRes.json();
 
-    currentEntity = { type: mediaType, id: movie.id, title: movie.title || movie.name };
+    currentEntity = { type: mediaType, id: movie.id, title: movie.title || movie.name, credits: credits };
 
-    // Přepnutí repertoáru na záložku filmů/seriálů
     setRepertoireTab(mediaType === 'tv' ? 'series' : 'movies');
 
     document.getElementById('filmography-section').style.display = 'none';
@@ -265,13 +281,31 @@ async function analyzeMovie(id, mediaType = 'movie') {
         movie.production_countries.forEach(c => geocodeAndAddMarker(c.name, movie.title || movie.name));
     }
 
-    const releaseDate = movie.release_date || movie.first_air_date;
-    if (releaseDate) {
-        timelineItems.add({ id: 'current_movie', content: movie.title || movie.name, start: releaseDate, className: 'film-node' });
-        timeline.fit();
+    // Load full director's timeline automatically for this movie!
+    const director = credits.crew.find(c => c.job === 'Director');
+    if (director) {
+        fetchAndPopulateDirectorTimeline(director);
+    } else {
+        const releaseDate = movie.release_date || movie.first_air_date;
+        if (releaseDate) {
+            document.getElementById('timeline-title').innerText = `TIMELINE: ${movie.title || movie.name}`;
+            timelineItems.add({ id: 'current_movie', movieId: movie.id, content: movie.title || movie.name, start: releaseDate, className: 'film-node' });
+            timeline.fit();
+        }
     }
     
     switchView('map');
+}
+
+async function fetchAndPopulateDirectorTimeline(director) {
+    try {
+        const credRes = await fetch(`https://api.themoviedb.org/3/person/${director.id}/movie_credits?api_key=${TMDB_API_KEY}`);
+        const credits = await credRes.json();
+        let works = credits.crew.filter(c => c.job === 'Director' && c.release_date);
+        
+        document.getElementById('timeline-title').innerText = `DIRECTOR TIMELINE: ${director.name.toUpperCase()}`;
+        populateTimeline(works, director.name);
+    } catch (e) { console.error('Error fetching director timeline'); }
 }
 
 function renderMovieProfile(movie, mediaType) {
@@ -286,9 +320,9 @@ function renderMovieProfile(movie, mediaType) {
     const genres = movie.genres ? movie.genres.map(g => g.name).join(', ') : '';
     const runtime = movie.runtime || (movie.episode_run_time ? movie.episode_run_time[0] : null);
     
-    let detailsHtml = `<div><span class="label">Rok:</span> <span class="interactive-link" onclick="jumpToYear('${releaseDate}')">${year}</span></div>`;
-    if (runtime) detailsHtml += `<div><span class="label">Stopáž:</span> ${runtime} min</div>`;
-    if (genres) detailsHtml += `<div><span class="label">Žánry:</span> ${genres}</div>`;
+    let detailsHtml = `<div><span class="label">Year:</span> <span class="interactive-link" onclick="jumpToYear('${releaseDate}')">${year}</span></div>`;
+    if (runtime) detailsHtml += `<div><span class="label">Runtime:</span> ${runtime} min</div>`;
+    if (genres) detailsHtml += `<div><span class="label">Genres:</span> ${genres}</div>`;
     
     document.getElementById('entity-details').innerHTML = detailsHtml;
     document.getElementById('entity-bio').innerText = movie.overview || '';
@@ -314,12 +348,12 @@ function renderMovieProfile(movie, mediaType) {
     repBtn.style.width = 'auto';
     repBtn.style.padding = '0 8px';
     repBtn.style.fontSize = '10px';
-    repBtn.innerHTML = `${SVG_ICONS.pin} <span style="margin-left:4px;">${existing ? 'V repertoáru' : 'Přidat'}</span>`;
+    repBtn.innerHTML = `${SVG_ICONS.pin} <span style="margin-left:4px;">${existing ? 'IN REPERTOIRE' : 'ADD TO REPERTOIRE'}</span>`;
     repBtn.onclick = () => forceAddToRepertoire();
     actionsDiv.appendChild(repBtn);
 }
 
-// --- ZOBRAZENÍ TVŮRCŮ (Místo Node Mapy) ---
+// --- CAST & CREW BREAKDOWN (Typography-focused, Max 4 shown, Clean Expand) ---
 function renderCreatorsBreakdown(credits) {
     const section = document.getElementById('creators-section');
     const container = document.getElementById('creators-breakdown');
@@ -327,12 +361,12 @@ function renderCreatorsBreakdown(credits) {
     container.innerHTML = '';
 
     const rolesMap = [
-        { title: 'Režie', crew: credits.crew.filter(c => c.job === 'Director') },
-        { title: 'Scénář', crew: credits.crew.filter(c => c.department === 'Writing') },
-        { title: 'Kamera', crew: credits.crew.filter(c => c.department === 'Camera') },
-        { title: 'Hudba', crew: credits.crew.filter(c => c.department === 'Sound' || c.job === 'Original Music Composer') },
-        { title: 'Střih', crew: credits.crew.filter(c => c.department === 'Editing') },
-        { title: 'Obsazení (Herci)', crew: credits.cast.slice(0, 6) }
+        { title: 'DIRECTOR', crew: credits.crew.filter(c => c.job === 'Director') },
+        { title: 'SCREENPLAY', crew: credits.crew.filter(c => c.department === 'Writing') },
+        { title: 'CAMERA', crew: credits.crew.filter(c => c.department === 'Camera') },
+        { title: 'MUSIC', crew: credits.crew.filter(c => c.department === 'Sound' || c.job === 'Original Music Composer') },
+        { title: 'EDITING', crew: credits.crew.filter(c => c.department === 'Editing') },
+        { title: 'CAST', crew: credits.cast }
     ];
 
     rolesMap.forEach(group => {
@@ -347,16 +381,56 @@ function renderCreatorsBreakdown(credits) {
             const namesDiv = document.createElement('div');
             namesDiv.className = 'creator-names';
             
-            // Unikátní lidé
             const uniqueCrew = Array.from(new Map(group.crew.map(c => [c.id, c])).values());
-            
-            uniqueCrew.forEach(person => {
-                const tag = document.createElement('span');
-                tag.className = 'creator-tag';
-                tag.innerText = person.name;
-                tag.onclick = () => openSubInspectorPerson(person.id, currentEntity.id);
-                namesDiv.appendChild(tag);
+            const limit = 4;
+            const shownList = uniqueCrew.slice(0, limit);
+            const hiddenList = uniqueCrew.slice(limit);
+
+            const appendPersonItem = (person) => {
+                const item = document.createElement('span');
+                item.className = 'creator-name-item';
+                item.innerText = person.name;
+                item.onclick = () => openSubInspectorPerson(person.id, currentEntity.id);
+                namesDiv.appendChild(item);
+            };
+
+            shownList.forEach((person, idx) => {
+                appendPersonItem(person);
+                if (idx < shownList.length - 1 || hiddenList.length > 0) {
+                    const sep = document.createElement('span');
+                    sep.style.color = '#334155';
+                    sep.innerText = '•';
+                    namesDiv.appendChild(sep);
+                }
             });
+
+            if (hiddenList.length > 0) {
+                const hiddenSpan = document.createElement('span');
+                hiddenSpan.style.display = 'none';
+                hiddenList.forEach((person, idx) => {
+                    const sep = document.createElement('span');
+                    sep.style.color = '#334155';
+                    sep.innerText = ' • ';
+                    hiddenSpan.appendChild(sep);
+
+                    const item = document.createElement('span');
+                    item.className = 'creator-name-item';
+                    item.innerText = person.name;
+                    item.onclick = () => openSubInspectorPerson(person.id, currentEntity.id);
+                    hiddenSpan.appendChild(item);
+                });
+
+                const moreBtn = document.createElement('span');
+                moreBtn.className = 'creator-more-btn';
+                moreBtn.innerText = `... (+${hiddenList.length} MORE)`;
+                moreBtn.onclick = () => {
+                    hiddenSpan.style.display = 'inline';
+                    moreBtn.style.display = 'none';
+                };
+
+                namesDiv.appendChild(moreBtn);
+                namesDiv.appendChild(hiddenSpan);
+            }
 
             groupDiv.appendChild(titleDiv);
             groupDiv.appendChild(namesDiv);
@@ -365,12 +439,12 @@ function renderCreatorsBreakdown(credits) {
     });
 }
 
-// --- PODVYHLEDÁVÁNÍ V LEVÉM PANELU ---
+// --- LEFT SUB-INSPECTOR PANEL ---
 async function openSubInspectorPerson(personId, highlightMovieId) {
     const subPanel = document.getElementById('sub-inspector-panel');
     const container = document.getElementById('sub-panel-content');
     subPanel.style.display = 'block';
-    container.innerHTML = `<p class="neon-text">Načítám detail tvůrce...</p>`;
+    container.innerHTML = `<p class="neon-text">LOADING CREATOR DETAILS...</p>`;
 
     try {
         const personRes = await fetch(`https://api.themoviedb.org/3/person/${personId}?api_key=${TMDB_API_KEY}`);
@@ -381,19 +455,19 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
 
         let works = credits.crew.length > 0 ? credits.crew : credits.cast;
         works = Array.from(new Map(works.filter(w => w.release_date).map(item => [item.id, item])).values())
-                .sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
+                .sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
 
         let html = `
             <div style="display:flex; gap:15px; margin-bottom:15px;">
-                <img src="${person.profile_path ? 'https://image.tmdb.org/t/p/w200' + person.profile_path : ''}" style="width:80px; height:120px; object-fit:cover; border:1px solid var(--neon-blue);">
+                <img src="${person.profile_path ? 'https://image.tmdb.org/t/p/w200' + person.profile_path : ''}" style="width:80px; height:120px; object-fit:cover; border:1px solid var(--neon-blue); border-radius:3px;">
                 <div>
-                    <h4 class="neon-text" style="margin:0 0 5px 0;">${person.name}</h4>
-                    <div style="font-size:10px; color:var(--neon-orange);">${person.known_for_department || ''}</div>
-                    <div style="font-size:11px; color:#aaa; margin-top:5px;">Narozen: ${person.birthday || 'Neznámo'}</div>
-                    <button class="action-btn" style="margin-top:8px; padding:3px 8px; font-size:10px;" onclick="analyzePerson(${person.id})">Plná analýza ➔</button>
+                    <h4 class="neon-text" style="margin:0 0 5px 0; font-size:15px;">${person.name}</h4>
+                    <div style="font-size:10px; color:var(--neon-orange); font-weight:700;">${person.known_for_department || ''}</div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:5px;">Born: ${person.birthday || 'Unknown'}</div>
+                    <button class="action-btn" style="margin-top:8px; padding:4px 10px; font-size:10px;" onclick="analyzePerson(${person.id})">FULL ANALYSIS ➔</button>
                 </div>
             </div>
-            <h4 style="color:var(--neon-orange); border-bottom:1px solid #333; padding-bottom:4px; font-size:12px;">Filmografie (Aktivní zvýraznění)</h4>
+            <h4 style="color:var(--neon-orange); border-bottom:1px solid #1e1e2e; padding-bottom:4px; font-size:11px; font-weight:800; letter-spacing:1px;">FILMOGRAPHY (ACTIVE HIGHLIGHT)</h4>
             <div class="list-container">
         `;
 
@@ -403,8 +477,8 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
             html += `
                 <div class="film-item ${isHighlighted ? 'highlighted-film' : ''}">
                     <div class="film-info">
-                        <span class="film-year">${year}</span>
-                        <span class="film-title" onclick="analyzeMovie(${w.id})">${w.title} ${isHighlighted ? '◀ (Aktivní)' : ''}</span>
+                        <span class="film-year" onclick="jumpToYear('${w.release_date}')">${year}</span>
+                        <span class="film-title" onclick="analyzeMovie(${w.id})">${w.title} ${isHighlighted ? '◄ (ACTIVE)' : ''}</span>
                     </div>
                 </div>
             `;
@@ -414,7 +488,7 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
         container.innerHTML = html;
 
     } catch (e) {
-        container.innerHTML = `<p style="color:red;">Chyba načítání detailu.</p>`;
+        container.innerHTML = `<p style="color:red;font-size:11px;">Failed to load creator details.</p>`;
     }
 }
 
@@ -422,18 +496,34 @@ function closeSubInspector() {
     document.getElementById('sub-inspector-panel').style.display = 'none';
 }
 
-// --- VÝPIS FILMOGRAFIE OSOBY ---
+// --- RENDER FILMOGRAPHY LIST (DEFAULT: NEWEST FIRST) ---
+function toggleFilmographySort() {
+    filmographySortOrder = filmographySortOrder === 'desc' ? 'asc' : 'desc';
+    const btn = document.getElementById('filmography-sort-btn');
+    btn.innerHTML = `<span>${filmographySortOrder === 'desc' ? 'NEWEST FIRST' : 'OLDEST FIRST'}</span> ↕`;
+    if (currentEntity && currentEntity.works) {
+        renderFilmographyList(currentEntity.works);
+    }
+}
+
 function renderFilmographyList(works) {
     const listDiv = document.getElementById('filmography-list');
     document.getElementById('filmography-section').style.display = 'block';
     listDiv.innerHTML = '';
-    
+
+    // Sort according to active order
+    const sortedWorks = [...works].sort((a, b) => {
+        const dateA = new Date(a.release_date || 0);
+        const dateB = new Date(b.release_date || 0);
+        return filmographySortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    });
+
     const cat = getCategoryFromDepartment(currentEntity.job);
     const repData = repertoire.find(r => r.id === currentEntity.id && r.category === cat);
     const seenArray = repData ? repData.seen : [];
     const wishArray = repData ? (repData.wish || []) : [];
 
-    works.forEach(m => {
+    sortedWorks.forEach(m => {
         const year = m.release_date ? m.release_date.split('-')[0] : '????';
         const isSeen = seenArray.includes(m.id);
         const isWish = wishArray.includes(m.id);
@@ -463,13 +553,13 @@ function renderFilmographyList(works) {
         const seenBtn = document.createElement('button');
         seenBtn.className = `btn-icon ${isSeen ? 'active-seen' : ''}`;
         seenBtn.innerHTML = SVG_ICONS.check;
-        seenBtn.title = 'Viděno';
+        seenBtn.title = 'Watched';
         seenBtn.onclick = () => toggleFilmStatus(m.id, 'seen');
 
         const wishBtn = document.createElement('button');
         wishBtn.className = `btn-icon ${isWish && !isSeen ? 'active-wish' : ''}`;
         wishBtn.innerHTML = SVG_ICONS.circle;
-        wishBtn.title = 'Chci vidět';
+        wishBtn.title = 'Want to watch';
         wishBtn.onclick = () => toggleFilmStatus(m.id, 'wish');
 
         actionsDiv.appendChild(seenBtn);
@@ -481,7 +571,7 @@ function renderFilmographyList(works) {
     });
 }
 
-// --- SPRAVA REPERTOÁRU & TABS ---
+// --- REPERTOIRE TABS MANAGEMENT ---
 function setRepertoireTab(cat) {
     activeRepertoireTab = cat;
     document.querySelectorAll('.rep-tab-btn').forEach(btn => {
@@ -544,12 +634,22 @@ function forceAddToRepertoire() {
             renderPersonProfile(currentEntity, currentEntity.works.length);
         }
     } else {
+        // Adding a Movie automatically syncs movie to Movies Repertoire AND syncs Director to Directing Repertoire!
         const cat = currentEntity.type === 'tv' ? 'series' : 'movies';
         if (!repertoire.find(r => r.id === currentEntity.id && r.category === cat)) {
             repertoire.push({ id: currentEntity.id, name: currentEntity.title, category: cat, total: 1, seen: [currentEntity.id], wish: [], pinned: false, hidden: false });
-            saveRepertoire();
-            renderMovieProfile(currentEntity, currentEntity.type);
         }
+
+        // Auto sync Director if credits available
+        if (currentEntity.credits && currentEntity.credits.crew) {
+            const dir = currentEntity.credits.crew.find(c => c.job === 'Director');
+            if (dir && !repertoire.find(r => r.id === dir.id && r.category === 'directors')) {
+                repertoire.push({ id: dir.id, name: dir.name, category: 'directors', total: 10, seen: [currentEntity.id], wish: [], pinned: false, hidden: false });
+            }
+        }
+
+        saveRepertoire();
+        renderMovieProfile(currentEntity, currentEntity.type);
     }
 }
 
@@ -562,28 +662,26 @@ function toggleRepertoireAttr(id, cat, attr) {
 }
 
 function saveRepertoire() {
-    localStorage.setItem('cinematicRepertoirePRO_v2', JSON.stringify(repertoire));
+    localStorage.setItem('cinematicRepertoirePRO_v3', JSON.stringify(repertoire));
     renderRepertoire();
 }
 
-// Výpočet přechodu barev: Tmavě fialová -> Oranžová -> Zelená
+// Color gradient: Purple (#5b21b6) -> Orange (#f97316) -> Green (#10b981)
 function calculateScoreColor(seen, total) {
-    if (total === 0) return '#4c1d95'; // Tmavě fialová pro 0%
+    if (total === 0) return '#5b21b6';
     const ratio = Math.min(seen / total, 1);
     
     if (ratio < 0.5) {
-        // Interpolace od fialové (76, 29, 149) k oranžové (255, 102, 0)
         const t = ratio / 0.5;
-        const r = Math.round(76 + (255 - 76) * t);
-        const g = Math.round(29 + (102 - 29) * t);
-        const b = Math.round(149 - 149 * t);
+        const r = Math.round(91 + (249 - 91) * t);
+        const g = Math.round(33 + (115 - 33) * t);
+        const b = Math.round(182 - 160 * t);
         return `rgb(${r}, ${g}, ${b})`;
     } else {
-        // Interpolace od oranžové (255, 102, 0) k zelené (0, 230, 118)
         const t = (ratio - 0.5) / 0.5;
-        const r = Math.round(255 - 255 * t);
-        const g = Math.round(102 + (230 - 102) * t);
-        const b = Math.round(0 + 118 * t);
+        const r = Math.round(249 - 233 * t);
+        const g = Math.round(115 + (70) * t);
+        const b = Math.round(22 + 107 * t);
         return `rgb(${r}, ${g}, ${b})`;
     }
 }
@@ -611,7 +709,7 @@ function renderRepertoire() {
     });
 
     if (filtered.length === 0) {
-        listDiv.innerHTML = `<p style="font-size:11px; color:#555; text-align:center; margin-top:15px;">Žádný položky v této záložce.</p>`;
+        listDiv.innerHTML = `<p style="font-size:11px; color:#475569; text-align:center; margin-top:15px;">No items in this tab.</p>`;
         return;
     }
 
@@ -639,13 +737,13 @@ function renderRepertoire() {
         const pinBtn = document.createElement('button');
         pinBtn.className = `btn-icon ${item.pinned ? 'active-pinned' : ''}`;
         pinBtn.innerHTML = SVG_ICONS.pin;
-        pinBtn.title = 'Pinnout nahoru';
+        pinBtn.title = 'Pin to top';
         pinBtn.onclick = (e) => { e.stopPropagation(); toggleRepertoireAttr(item.id, item.category, 'pinned'); };
 
         const hideBtn = document.createElement('button');
         hideBtn.className = 'btn-icon';
         hideBtn.innerHTML = SVG_ICONS.eye;
-        hideBtn.title = 'Skrýt';
+        hideBtn.title = 'Hide';
         hideBtn.onclick = (e) => { e.stopPropagation(); toggleRepertoireAttr(item.id, item.category, 'hidden'); };
 
         actionsDiv.appendChild(pinBtn);
@@ -657,7 +755,7 @@ function renderRepertoire() {
     });
 }
 
-// --- POMOCNÉ FUNKCE (Mapa, Timeline) ---
+// --- HELPER FUNCTIONS ---
 function clearVisuals() {
     currentMarkers.forEach(m => m.remove());
     currentMarkers = [];
@@ -675,6 +773,7 @@ function jumpToYear(dateString) {
 }
 
 function populateTimeline(works, groupName) {
+    timelineItems.clear();
     works.forEach((m, idx) => {
         if (m.release_date) {
             timelineItems.add({ id: idx, movieId: m.id, content: m.title, start: m.release_date, className: 'film-node' });
@@ -691,19 +790,18 @@ async function geocodeAndZoom(locationString, title) {
             const center = data.features[0].center;
             switchView('map');
             
-            // Odstranění starých markerů a přidání nového špendlíku
             currentMarkers.forEach(m => m.remove());
             currentMarkers = [];
 
             const el = document.createElement('div');
             el.className = 'custom-marker';
-            const popup = new mapboxgl.Popup({ offset: 12 }).setHTML(`<div style="color:var(--neon-orange);font-weight:bold;font-size:11px;">${title}</div><div style="font-size:10px;color:#aaa;">${locationString}</div>`);
+            const popup = new mapboxgl.Popup({ offset: 12 }).setHTML(`<div style="color:var(--neon-orange);font-weight:700;font-size:11px;">${title}</div><div style="font-size:10px;color:#94a3b8;">${locationString}</div>`);
             const marker = new mapboxgl.Marker(el).setLngLat(center).setPopup(popup).addTo(map);
             currentMarkers.push(marker);
 
             map.flyTo({ center: center, zoom: 5, essential: true });
         }
-    } catch (e) { console.error("Geocoding selhal."); }
+    } catch (e) { console.error("Geocoding failed."); }
 }
 
 async function geocodeAndAddMarker(locationString, movieTitle) {
@@ -716,7 +814,7 @@ async function geocodeAndAddMarker(locationString, movieTitle) {
             
             const el = document.createElement('div');
             el.className = 'custom-marker';
-            const popup = new mapboxgl.Popup({ offset: 12 }).setHTML(`<div style="color:var(--neon-orange);font-weight:bold;font-size:11px;">Místo natáčení / Produkce: ${locationString}</div><div style="font-size:10px;color:#ccc;">🎬 ${movieTitle}</div>`);
+            const popup = new mapboxgl.Popup({ offset: 12 }).setHTML(`<div style="color:var(--neon-orange);font-weight:700;font-size:11px;">Production Location: ${locationString}</div><div style="font-size:10px;color:#cbd5e1;">🎬 ${movieTitle}</div>`);
             const marker = new mapboxgl.Marker(el).setLngLat([lng, lat]).setPopup(popup).addTo(map);
             currentMarkers.push(marker);
         }
