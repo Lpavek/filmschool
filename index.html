@@ -267,7 +267,7 @@
             const resultsContent = document.getElementById('results-content');
             resultsContent.innerHTML = `<p>Querying TMDB for: <span style="color:var(--neon-blue)">${query}</span>...</p>`;
 
-            if (TMDB_API_KEY === '8818385dc34c1143c1b2589f2d36f790') {
+            if (TMDB_API_KEY === 'SEM_VLOZ_SVUJ_TMDB_KLIC') {
                 resultsContent.innerHTML = `<p style="color:var(--neon-orange)">API KEY MISSING. PLEASE INSERT TMDB API KEY IN THE CODE (FIRST).</p>`;
                 return;
             }
@@ -349,7 +349,7 @@
         }
 
         async function mapProductionLocations(movies) {
-            if (mapboxgl.accessToken === 'pk.eyJ1IjoibHVxcWV5IiwiYSI6ImNtdmF4MXg3OTA4c3oyeXI0aTgzNnM5MW4ifQ.ZoG892NR3JW26wh-ZGdPRg') {
+            if (mapboxgl.accessToken === 'SEM_VLOZ_SVUJ_MAPBOX_KLIC') {
                 console.warn("Mapbox API key missing. Skipping map population.");
                 return;
             }
