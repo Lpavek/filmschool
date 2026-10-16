@@ -24,6 +24,13 @@
                 <button id="btn-map" class="active" onclick="switchView('map')">MAP</button>
                 <button id="btn-timeline" onclick="switchView('timeline')">TIMELINE</button>
             </div>
+
+            <!-- Atmosphere Glow Intensity Slider -->
+            <div class="glow-control">
+                <span class="glow-label">GLOW</span>
+                <input type="range" id="glowSlider" min="0" max="100" value="50" oninput="updateGlobeGlow(this.value)">
+            </div>
+
             <div class="search-container">
                 <input type="text" id="searchInput" placeholder="SEARCH CREATOR OR MOVIE..." onkeypress="handleEnter(event)">
                 <button class="action-btn" onclick="searchAction()">SEARCH</button>
@@ -32,7 +39,7 @@
     </header>
 
     <div id="main-content">
-        <!-- Visual Panel (Left - Default 60%) -->
+        <!-- Visual Panel (Left) -->
         <div id="visual-panel">
             <div id="map"></div>
             <div id="timeline-view">
@@ -40,7 +47,7 @@
                 <div id="timeline-container"></div>
             </div>
             
-            <!-- Left Sub-Inspector Panel (Full Creator Details) -->
+            <!-- Left Sub-Inspector Panel -->
             <div id="sub-inspector-panel" class="sub-panel" style="display: none;">
                 <div class="sub-panel-header">
                     <span class="sub-panel-title neon-text" id="sub-panel-title">FULL CREATOR ANALYSIS</span>
@@ -52,10 +59,10 @@
             </div>
         </div>
 
-        <!-- Draggable Resizer Bar -->
+        <!-- Vertical Resizer Bar (Left / Right Panel Splitter) -->
         <div id="resizer"></div>
 
-        <!-- Data Panel (Right - Default 40%) -->
+        <!-- Data Panel (Right) -->
         <div id="data-panel">
             
             <!-- Top Scrollable Content Container -->
@@ -108,6 +115,9 @@
                 </div>
 
             </div>
+
+            <!-- Horizontal Resizer Bar (Top / Bottom Repertoire Splitter) -->
+            <div id="resizer-h"></div>
 
             <!-- Locked Bottom Repertoire Section -->
             <div class="section" id="repertoire-section">
