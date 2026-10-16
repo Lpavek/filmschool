@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cinematic Atlas - Professional Edition</title>
+    <title>Cinematic Atlas</title>
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>">
@@ -18,32 +18,32 @@
 <body>
 
     <header>
-        <h2 class="neon-text">Cinematic Atlas</h2>
+        <h2 class="neon-text">CINEMATIC ATLAS</h2>
         <div class="controls">
             <div class="view-toggles">
-                <button id="btn-map" class="active" onclick="switchView('map')">Mapa</button>
-                <button id="btn-timeline" onclick="switchView('timeline')">Timeline</button>
+                <button id="btn-map" class="active" onclick="switchView('map')">MAP</button>
+                <button id="btn-timeline" onclick="switchView('timeline')">TIMELINE</button>
             </div>
             <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Hledat tvůrce nebo film..." onkeypress="handleEnter(event)">
-                <button class="action-btn" onclick="searchAction()">Hledat</button>
+                <input type="text" id="searchInput" placeholder="SEARCH CREATOR OR MOVIE..." onkeypress="handleEnter(event)">
+                <button class="action-btn" onclick="searchAction()">SEARCH</button>
             </div>
         </div>
     </header>
 
     <div id="main-content">
-        <!-- Levý panel: Vizualizace a Podvyhledávání -->
+        <!-- Visual Panel (Left) -->
         <div id="visual-panel">
             <div id="map"></div>
             <div id="timeline-view">
-                <h3 class="neon-text">Globální Timeline</h3>
+                <h3 class="neon-text" id="timeline-title">GLOBAL TIMELINE</h3>
                 <div id="timeline-container"></div>
             </div>
             
-            <!-- Levý panel pro aktivní podvyhledávání (detail tvůrce z filmu nebo detail filmu z tvůrce) -->
+            <!-- Left Sub-Inspector Panel -->
             <div id="sub-inspector-panel" class="sub-panel" style="display: none;">
                 <div class="sub-panel-header">
-                    <span class="sub-panel-title neon-text" id="sub-panel-title">Aktivní Detail</span>
+                    <span class="sub-panel-title neon-text" id="sub-panel-title">ACTIVE DETAIL</span>
                     <button class="close-btn" onclick="closeSubInspector()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
@@ -52,19 +52,19 @@
             </div>
         </div>
 
-        <!-- Posuvná delička panelů -->
+        <!-- Draggable Resizer Bar -->
         <div id="resizer"></div>
 
-        <!-- Pravý panel: Data, Analýza a Repertoár -->
+        <!-- Data Panel (Right) -->
         <div id="data-panel">
-            <!-- Hlavní sekce Biografie / Detailu -->
+            <!-- Active Analysis Section -->
             <div class="section" id="active-analysis-section">
-                <h3 id="analysis-section-title">Aktivní Analýza</h3>
+                <h3 id="analysis-section-title">ACTIVE ANALYSIS</h3>
                 <div id="results-content">
-                    <p style="color: #666;">Zadejte tvůrce nebo film do vyhledávání.</p>
+                    <p style="color: #666; font-size: 11px;">Search for a creator or movie to start analysis.</p>
                 </div>
 
-                <!-- Detaily osoby nebo filmu -->
+                <!-- Entity Profile -->
                 <div id="entity-profile" style="display: none;">
                     <div class="profile-header">
                         <img id="entity-photo" src="" alt="Profile">
@@ -80,46 +80,53 @@
                 </div>
             </div>
 
-            <!-- Sekce Tvůrci (při rozkliku filmu) -->
+            <!-- Cast & Crew Breakdown -->
             <div class="section" id="creators-section" style="display:none;">
-                <h3>Tvůrci & Obsazení</h3>
+                <h3>CAST & CREW</h3>
                 <div id="creators-breakdown" class="creators-grid"></div>
             </div>
 
-            <!-- Filmografie (při rozkliku osoby) -->
+            <!-- Filmography List -->
             <div class="section" id="filmography-section" style="display:none;">
-                <h3 id="filmography-title">Filmografie</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h3 id="filmography-title" style="margin-bottom:0;">FILMOGRAPHY</h3>
+                    <button class="sort-toggle-btn" id="filmography-sort-btn" onclick="toggleFilmographySort()" title="Toggle Order">
+                        <span>NEWEST FIRST</span> ↕
+                    </button>
+                </div>
                 <div id="filmography-list" class="list-container"></div>
             </div>
 
-            <!-- Sekce Repertoár -->
+            <!-- Repertoire Section -->
             <div class="section" id="repertoire-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3>Můj Repertoár</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="margin-bottom:0;">MY REPERTOIRE</h3>
                     <div class="repertoire-filters">
                         <select id="filter-visibility" onchange="renderRepertoire()">
-                            <option value="main">Aktivní</option>
-                            <option value="hidden">Skryté</option>
-                            <option value="all">Vše</option>
+                            <option value="main">ACTIVE</option>
+                            <option value="hidden">HIDDEN</option>
+                            <option value="all">ALL</option>
                         </select>
                         <select id="filter-sort" onchange="renderRepertoire()">
-                            <option value="desc">Skóre (Nejvyšší)</option>
-                            <option value="asc">Skóre (Nejnižší)</option>
-                            <option value="alpha">Abecedně</option>
+                            <option value="desc">SCORE (HIGH-LOW)</option>
+                            <option value="asc">SCORE (LOW-HIGH)</option>
+                            <option value="alpha">A-Z</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- Záložky kategórií Repertoáru -->
-                <div class="rep-tabs" id="rep-tabs">
-                    <button class="rep-tab-btn active" data-cat="directors" onclick="setRepertoireTab('directors')">Režie</button>
-                    <button class="rep-tab-btn" data-cat="writers" onclick="setRepertoireTab('writers')">Scénář</button>
-                    <button class="rep-tab-btn" data-cat="cinematographers" onclick="setRepertoireTab('cinematographers')">Kamera</button>
-                    <button class="rep-tab-btn" data-cat="musicians" onclick="setRepertoireTab('musicians')">Hudba</button>
-                    <button class="rep-tab-btn" data-cat="editors" onclick="setRepertoireTab('editors')">Střih</button>
-                    <button class="rep-tab-btn" data-cat="actors" onclick="setRepertoireTab('actors')">Herci</button>
-                    <button class="rep-tab-btn" data-cat="movies" onclick="setRepertoireTab('movies')">Filmy</button>
-                    <button class="rep-tab-btn" data-cat="series" onclick="setRepertoireTab('series')">Seriály</button>
+                <!-- Sleek Repertoire Category Tabs -->
+                <div class="rep-tabs-wrapper">
+                    <div class="rep-tabs" id="rep-tabs">
+                        <button class="rep-tab-btn active" data-cat="directors" onclick="setRepertoireTab('directors')">DIRECTING</button>
+                        <button class="rep-tab-btn" data-cat="writers" onclick="setRepertoireTab('writers')">SCREENPLAY</button>
+                        <button class="rep-tab-btn" data-cat="cinematographers" onclick="setRepertoireTab('cinematographers')">CAMERA</button>
+                        <button class="rep-tab-btn" data-cat="musicians" onclick="setRepertoireTab('musicians')">MUSIC</button>
+                        <button class="rep-tab-btn" data-cat="editors" onclick="setRepertoireTab('editors')">EDITING</button>
+                        <button class="rep-tab-btn" data-cat="actors" onclick="setRepertoireTab('actors')">ACTING</button>
+                        <button class="rep-tab-btn" data-cat="movies" onclick="setRepertoireTab('movies')">MOVIES</button>
+                        <button class="rep-tab-btn" data-cat="series" onclick="setRepertoireTab('series')">SERIES</button>
+                    </div>
                 </div>
 
                 <div id="repertoire-list" class="repertoire-container"></div>
@@ -127,7 +134,7 @@
         </div>
     </div>
 
-    <!-- Externí Skripty -->
+    <!-- Scripts -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
     <script src="app.js"></script>
