@@ -5,7 +5,7 @@ mapboxgl.accessToken = 'pk.eyJ1IjoibHVxcWV5IiwiYSI6ImNtdmF4MXg3OTA4c3oyeXI0aTgzN
 let map, timeline;
 let timelineItems = new vis.DataSet([]);
 let currentMarkers = [];
-let currentEntity = null; // Currently inspected movie or person
+let currentEntity = null;
 let isRotating = true;
 let mapIdleTimer;
 let activeRepertoireTab = 'directors';
@@ -24,7 +24,7 @@ const SVG_ICONS = {
 };
 
 // Repertoire storage
-let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v4')) || [];
+let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v5')) || [];
 
 function initApp() {
     // 1. Initialize Mapbox Globe
@@ -36,15 +36,8 @@ function initApp() {
         projection: 'globe'
     });
 
-    // Balanced Atmosphere Glow (Soft ambient halo between white and dark)
     map.on('style.load', () => {
-        map.setFog({
-            'range': [0.8, 10],
-            'color': 'rgba(20, 25, 45, 0.75)',
-            'high-color': 'rgba(200, 210, 240, 0.45)',
-            'space-color': '#030509',
-            'horizon-blend': 0.1
-        });
+        updateGlobeGlow(50); // Default glow setting
     });
 
     // Idle rotation logic
@@ -70,13 +63,27 @@ function initApp() {
         }
     });
 
-    // 3. Initialize Panel Resizer
-    initResizer();
+    // 3. Initialize Both Resizers (Vertical & Horizontal)
+    initResizers();
 
     // 4. Initialize Wheel Tab Switcher
     initTabsScroll();
 
     renderRepertoire();
+}
+
+// --- DYNAMIC GLOBE ATMOSPHERE GLOW CONTROL ---
+function updateGlobeGlow(val) {
+    if (!map) return;
+    const factor = val / 100;
+    
+    map.setFog({
+        'range': [0.5, 10],
+        'color': `rgba(${Math.round(20 * factor)}, ${Math.round(30 * factor)}, ${Math.round(60 * factor)}, ${0.85 * factor})`,
+        'high-color': `rgba(${Math.round(220 * factor)}, ${Math.round(230 * factor)}, ${Math.round(255 * factor)}, ${0.65 * factor})`,
+        'space-color': '#030509',
+        'horizon-blend': 0.02 + 0.18 * factor
+    });
 }
 
 function rotateGlobe() {
@@ -88,34 +95,60 @@ function rotateGlobe() {
     }
 }
 
-// --- DRAGGABLE RESIZER ---
-function initResizer() {
-    const resizer = document.getElementById('resizer');
+// --- DRAGGABLE RESIZERS (VERTICAL & HORIZONTAL) ---
+function initResizers() {
+    // 1. Vertical Splitter (Left/Right Panel width)
+    const resizerV = document.getElementById('resizer');
     const rightPanel = document.getElementById('data-panel');
-    let isDragging = false;
+    let isDraggingV = false;
 
-    resizer.addEventListener('mousedown', () => {
-        isDragging = true;
-        resizer.classList.add('dragging');
+    resizerV.addEventListener('mousedown', () => {
+        isDraggingV = true;
+        resizerV.classList.add('dragging');
         document.body.style.cursor = 'col-resize';
     });
 
+    // 2. Horizontal Splitter (Top Analyses / Bottom Repertoire height)
+    const resizerH = document.getElementById('resizer-h');
+    const repSection = document.getElementById('repertoire-section');
+    let isDraggingH = false;
+
+    resizerH.addEventListener('mousedown', () => {
+        isDraggingH = true;
+        resizerH.classList.add('dragging');
+        document.body.style.cursor = 'row-resize';
+    });
+
     document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const containerWidth = document.getElementById('main-content').offsetWidth;
-        const newRightWidth = containerWidth - e.clientX;
-        if (newRightWidth > 320 && newRightWidth < containerWidth - 320) {
-            rightPanel.style.width = `${newRightWidth}px`;
-            if (map) map.resize();
+        if (isDraggingV) {
+            const containerWidth = document.getElementById('main-content').offsetWidth;
+            const newRightWidth = containerWidth - e.clientX;
+            // Expanded limit: allow dragging up to 90% of screen width
+            if (newRightWidth > 150 && newRightWidth < containerWidth - 100) {
+                rightPanel.style.width = `${newRightWidth}px`;
+                if (map) map.resize();
+            }
+        }
+        if (isDraggingH) {
+            const panelRect = rightPanel.getBoundingClientRect();
+            const newRepHeight = panelRect.bottom - e.clientY;
+            if (newRepHeight > 100 && newRepHeight < panelRect.height - 100) {
+                repSection.style.height = `${newRepHeight}px`;
+            }
         }
     });
 
     document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            resizer.classList.remove('dragging');
+        if (isDraggingV) {
+            isDraggingV = false;
+            resizerV.classList.remove('dragging');
             document.body.style.cursor = 'default';
             if (map) map.resize();
+        }
+        if (isDraggingH) {
+            isDraggingH = false;
+            resizerH.classList.remove('dragging');
+            document.body.style.cursor = 'default';
         }
     });
 }
@@ -128,7 +161,7 @@ function initTabsScroll() {
     tabsContainer.addEventListener('wheel', (e) => {
         e.preventDefault();
         const now = Date.now();
-        if (now - lastTabWheelTime < 150) return; // Debounce 150ms
+        if (now - lastTabWheelTime < 150) return; // 150ms debounce
 
         let idx = REPERTOIRE_CATEGORIES.indexOf(activeRepertoireTab);
         if (e.deltaY > 0 && idx < REPERTOIRE_CATEGORIES.length - 1) {
@@ -386,7 +419,6 @@ function renderFinancials(movie) {
 
     const fmtUSD = (val) => '$' + val.toLocaleString('en-US');
 
-    // Calculate graph bar percentages
     const maxVal = Math.max(budget, revenue);
     const budgetPct = maxVal > 0 ? Math.round((budget / maxVal) * 100) : 0;
     const revenuePct = maxVal > 0 ? Math.round((revenue / maxVal) * 100) : 0;
@@ -754,7 +786,7 @@ function toggleRepertoireAttr(id, cat, attr) {
 }
 
 function saveRepertoire() {
-    localStorage.setItem('cinematicRepertoirePRO_v4', JSON.stringify(repertoire));
+    localStorage.setItem('cinematicRepertoirePRO_v5', JSON.stringify(repertoire));
     renderRepertoire();
 }
 
@@ -800,7 +832,7 @@ function renderRepertoire() {
     });
 
     if (filtered.length === 0) {
-        listDiv.innerHTML = `<p style="font-size:11px; color:#475569; text-align:center; margin-top:15px;">No items in this tab.</p>`;
+        listDiv.innerHTML = `<p style="font-size:11px; color:#475569; text-align:center; margin-top:10px;">No items in this tab.</p>`;
         return;
     }
 
