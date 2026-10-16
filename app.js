@@ -25,7 +25,7 @@ function initApp() {
 
     map.on('style.load', () => { map.setFog({}); });
     
-    // Idle logika mapy
+    // Idle logika mapy - automatická rotace po 12s nečinnosti
     const resetIdle = () => {
         isRotating = false;
         clearTimeout(mapIdleTimer);
@@ -40,7 +40,7 @@ function initApp() {
         start: '1970-01-01', end: '2030-01-01', height: '100%', zoomMin: 1000 * 60 * 60 * 24 * 365,
     });
 
-    // 3. Node Network (Fusion style) - opravená struktura shapeProperties
+    // 3. Node Network (Fusion style) - opravená struktura parametrů pro vis-network
     const netContainer = document.getElementById('network-container');
     const netData = { nodes: nodes, edges: edges };
     const netOptions = {
@@ -49,11 +49,14 @@ function initApp() {
             color: { background: '#2b2b2b', border: '#555', highlight: { background: '#444', border: '#FF6600' } },
             font: { color: '#E0E0E0', face: 'monospace', size: 14 },
             borderWidth: 2,
-            shapeProperties: { borderRadius: 4 }, // Opraveno: borderRadius patři do shapeProperties
+            shapeProperties: {
+                borderRadius: 4
+            },
             margin: 10
         },
         edges: {
-            width: 2, color: { color: '#666', highlight: '#FF6600' },
+            width: 2,
+            color: { color: '#666', highlight: '#FF6600' },
             smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
             arrows: 'to'
         },
@@ -118,15 +121,27 @@ async function searchAction() {
             filtered.forEach(item => {
                 const title = item.media_type === 'movie' ? item.title : item.name;
                 const typeLabel = item.media_type === 'movie' ? '🎬 Film' : '👤 Person';
-                // Opraveno: Správný zápis volání funkce namísto dynamického hodnocení "item" v onclicku
-                const targetFunction = item.media_type === 'movie' ? `analyzeMovie(${item.id})` : `analyzePerson(${item.id})`;
                 
                 const div = document.createElement('div');
                 div.className = 'film-item';
-                div.innerHTML = `
-                    <div class="film-info"><strong class="neon-text">${title}</strong> <span style="font-size:10px;color:#888;">(${typeLabel})</span></div>
-                    <button class="action-btn" onclick="${targetFunction}">Analyze</button>
-                `;
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'film-info';
+                infoDiv.innerHTML = `<strong class="neon-text">${title}</strong> <span style="font-size:10px;color:#888;">(${typeLabel})</span>`;
+                
+                const btn = document.createElement('button');
+                btn.className = 'action-btn';
+                btn.textContent = 'Analyze';
+                btn.addEventListener('click', () => {
+                    if (item.media_type === 'movie') {
+                        analyzeMovie(item.id);
+                    } else {
+                        analyzePerson(item.id);
+                    }
+                });
+
+                div.appendChild(infoDiv);
+                div.appendChild(btn);
                 resDiv.appendChild(div);
             });
         } else { resDiv.innerHTML = `<p>No matches found.</p>`; }
@@ -154,7 +169,7 @@ async function analyzePerson(id) {
     currentEntity = { type: 'person', id: person.id, name: person.name, job: person.known_for_department, works: works };
 
     renderPersonProfile(person, works.length);
-    renderFilmographyList(works, 'person');
+    renderFilmographyList(works);
     populateTimeline(works, person.name);
     
     if (person.place_of_birth) geocodeAndZoom(person.place_of_birth);
@@ -201,7 +216,7 @@ async function analyzeMovie(id) {
 
     currentEntity = { type: 'movie', id: movie.id, title: movie.title };
 
-    renderMovieProfile(movie, credits);
+    renderMovieProfile(movie);
     
     if(movie.production_countries && movie.production_countries.length > 0) {
         movie.production_countries.forEach(c => geocodeAndAddMarker(c.name, movie.title));
@@ -217,7 +232,7 @@ async function analyzeMovie(id) {
     switchView('network');
 }
 
-function renderMovieProfile(movie, credits) {
+function renderMovieProfile(movie) {
     document.getElementById('entity-profile').style.display = 'block';
     document.getElementById('filmography-section').style.display = 'none';
     document.getElementById('entity-name').innerText = movie.title;
@@ -270,7 +285,7 @@ function buildMovieNetwork(movie, credits) {
 }
 
 // --- VÝPIS FILMOGRAFIE ---
-function renderFilmographyList(works, type) {
+function renderFilmographyList(works) {
     const listDiv = document.getElementById('filmography-list');
     document.getElementById('filmography-section').style.display = 'block';
     listDiv.innerHTML = '';
@@ -286,16 +301,44 @@ function renderFilmographyList(works, type) {
 
         const div = document.createElement('div');
         div.className = 'film-item';
-        div.innerHTML = `
-            <div class="film-info">
-                <span class="film-year" onclick="jumpToYear('${m.release_date}')" title="Show on Timeline">${year}</span>
-                <span class="film-title" onclick="analyzeMovie(${m.id})">${m.title}</span>
-            </div>
-            <div class="film-actions">
-                <button class="btn-icon ${isSeen ? 'active-seen' : ''}" onclick="toggleFilmStatus(${m.id}, 'seen')" title="Seen">✓</button>
-                <button class="btn-icon ${isWish && !isSeen ? 'active-wish' : ''}" onclick="toggleFilmStatus(${m.id}, 'wish')" title="Wishlist">O</button>
-            </div>
-        `;
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'film-info';
+        
+        const yearSpan = document.createElement('span');
+        yearSpan.className = 'film-year';
+        yearSpan.textContent = year;
+        yearSpan.title = 'Show on Timeline';
+        yearSpan.addEventListener('click', () => jumpToYear(m.release_date));
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'film-title';
+        titleSpan.textContent = m.title;
+        titleSpan.addEventListener('click', () => analyzeMovie(m.id));
+
+        infoDiv.appendChild(yearSpan);
+        infoDiv.appendChild(titleSpan);
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'film-actions';
+
+        const seenBtn = document.createElement('button');
+        seenBtn.className = `btn-icon ${isSeen ? 'active-seen' : ''}`;
+        seenBtn.textContent = '✓';
+        seenBtn.title = 'Seen';
+        seenBtn.addEventListener('click', () => toggleFilmStatus(m.id, 'seen'));
+
+        const wishBtn = document.createElement('button');
+        wishBtn.className = `btn-icon ${isWish && !isSeen ? 'active-wish' : ''}`;
+        wishBtn.textContent = 'O';
+        wishBtn.title = 'Wishlist';
+        wishBtn.addEventListener('click', () => toggleFilmStatus(m.id, 'wish'));
+
+        actionsDiv.appendChild(seenBtn);
+        actionsDiv.appendChild(wishBtn);
+
+        div.appendChild(infoDiv);
+        div.appendChild(actionsDiv);
         listDiv.appendChild(div);
     });
 }
@@ -323,7 +366,7 @@ function toggleFilmStatus(filmId, type) {
     }
 
     saveRepertoire();
-    renderFilmographyList(currentEntity.works, 'person');
+    renderFilmographyList(currentEntity.works);
 }
 
 function forceAddToRepertoire() {
@@ -382,16 +425,36 @@ function renderRepertoire() {
         div.className = `repertoire-item ${item.pinned ? 'pinned' : ''} ${item.hidden ? 'hidden-item' : ''}`;
         div.style.borderLeftColor = color;
         
-        div.innerHTML = `
-            <div class="rep-info" onclick="analyzePerson(${item.id})">
-                <span class="rep-name">${item.name}</span>
-                <span class="rep-score" style="color:${color}">${item.seen.length} / ${item.total}</span>
-            </div>
-            <div class="rep-actions">
-                <button class="btn-icon" style="border:none;" onclick="toggleRepertoireAttr(${item.id}, 'pinned')" title="Pin">📌</button>
-                <button class="btn-icon" style="border:none;" onclick="toggleRepertoireAttr(${item.id}, 'hidden')" title="Hide">👁️‍🗨️</button>
-            </div>
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'rep-info';
+        infoDiv.addEventListener('click', () => analyzePerson(item.id));
+        infoDiv.innerHTML = `
+            <span class="rep-name">${item.name}</span>
+            <span class="rep-score" style="color:${color}">${item.seen.length} / ${item.total}</span>
         `;
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'rep-actions';
+
+        const pinBtn = document.createElement('button');
+        pinBtn.className = 'btn-icon';
+        pinBtn.style.border = 'none';
+        pinBtn.textContent = '📌';
+        pinBtn.title = 'Pin';
+        pinBtn.addEventListener('click', () => toggleRepertoireAttr(item.id, 'pinned'));
+
+        const hideBtn = document.createElement('button');
+        hideBtn.className = 'btn-icon';
+        hideBtn.style.border = 'none';
+        hideBtn.textContent = '👁️‍🗨️';
+        hideBtn.title = 'Hide';
+        hideBtn.addEventListener('click', () => toggleRepertoireAttr(item.id, 'hidden'));
+
+        actionsDiv.appendChild(pinBtn);
+        actionsDiv.appendChild(hideBtn);
+
+        div.appendChild(infoDiv);
+        div.appendChild(actionsDiv);
         listDiv.appendChild(div);
     });
 }
