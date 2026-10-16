@@ -260,7 +260,7 @@
 
                 currentDirector = { id: detailData.id, name: detailData.name };
 
-                // Vykreslení UI
+                // Vykreslení UI - TADY BYLA CHYBA (\vert{}\vert{} místo ||)
                 document.getElementById('director-profile').style.display = 'flex';
                 document.getElementById('director-name').innerText = detailData.name;
                 document.getElementById('director-birth').innerText = `BORN: ${detailData.birthday \vert{}\vert{} 'UNKNOWN'}${detailData.deathday ? ' | DIED: '+detailData.deathday : ''}`;
@@ -394,12 +394,6 @@
                     </div>`;
                 listDiv.appendChild(div);
             });
-        }
-
-        function removeFromRepertoire(index) {
-            repertoire.splice(index, 1);
-            localStorage.setItem('cinematicRepertoire', JSON.stringify(repertoire));
-            renderRepertoire();
         }
     </script>
 </body>
