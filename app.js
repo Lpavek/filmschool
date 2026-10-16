@@ -11,6 +11,7 @@ let mapIdleTimer;
 let activeRepertoireTab = 'directors';
 let filmographySortOrder = 'desc';
 let showUpcoming = false;
+let isWishlistDrawerOpen = false;
 
 // Dynamic Tab Sorting State
 let tabSortMode = localStorage.getItem('cinematicTabSortMode') || 'recent';
@@ -26,7 +27,6 @@ let categoryMeta = JSON.parse(localStorage.getItem('cinematicCategoryMeta')) || 
 };
 
 const REPERTOIRE_CATEGORIES = ['directors', 'writers', 'cinematographers', 'musicians', 'editors', 'actors', 'movies', 'series'];
-let lastTabWheelTime = 0;
 
 // SVG Icons
 const SVG_ICONS = {
@@ -39,7 +39,7 @@ const SVG_ICONS = {
 };
 
 // Repertoire storage
-let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v8')) || [];
+let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v9')) || [];
 
 function initApp() {
     // 1. Initialize Mapbox Globe
@@ -65,9 +65,15 @@ function initApp() {
     map.on('moveend', () => { if (isRotating) rotateGlobe(); });
     rotateGlobe();
 
-    // 2. Initialize Timeline
+    // 2. Initialize Vis-Timeline
     timeline = new vis.Timeline(document.getElementById('timeline-container'), timelineItems, {
-        start: '1970-01-01', end: '2030-01-01', height: '100%', zoomMin: 1000 * 60 * 60 * 24 * 365,
+        start: '1970-01-01',
+        end: '2030-01-01',
+        height: '100%',
+        zoomMin: 1000 * 60 * 60 * 24 * 365,
+        margin: { item: 6, axis: 12 },
+        stack: true,
+        tooltip: { followMouse: true, overflowMethod: 'cap' }
     });
 
     timeline.on('select', function (properties) {
@@ -86,6 +92,7 @@ function initApp() {
 
     renderTabs();
     renderRepertoire();
+    renderWishlistDrawer();
 }
 
 // --- DYNAMIC GLOBE ATMOSPHERE GLOW CONTROL ---
@@ -168,7 +175,7 @@ function initResizers() {
     });
 }
 
-// --- REPERTOIRE TABS (FIXED: Touch/Update timestamp ONLY on item modification, NOT on view click) ---
+// --- REPERTOIRE TABS & SMOOTH WHEEL SCROLL FIX ---
 function touchCategory(cat) {
     if (!categoryMeta[cat]) categoryMeta[cat] = {};
     categoryMeta[cat].lastAdded = Date.now();
@@ -230,22 +237,11 @@ function initTabsScroll() {
     if (!tabsContainer) return;
 
     tabsContainer.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const now = Date.now();
-        if (now - lastTabWheelTime < 150) return;
-
-        const activeButtons = Array.from(tabsContainer.querySelectorAll('.rep-tab-btn'));
-        const activeCats = activeButtons.map(b => b.dataset.cat);
-        
-        let idx = activeCats.indexOf(activeRepertoireTab);
-        if (e.deltaY > 0 && idx < activeCats.length - 1) {
-            setRepertoireTab(activeCats[idx + 1]);
-            lastTabWheelTime = now;
-        } else if (e.deltaY < 0 && idx > 0) {
-            setRepertoireTab(activeCats[idx - 1]);
-            lastTabWheelTime = now;
+        if (e.deltaY !== 0) {
+            e.preventDefault();
+            tabsContainer.scrollLeft += e.deltaY;
         }
-    });
+    }, { passive: false });
 }
 
 // --- VIEW SWITCHER ---
@@ -309,7 +305,7 @@ async function searchAction() {
     } catch (err) { resDiv.innerHTML = `<p style="color:red;font-size:11px;">Connection error.</p>`; }
 }
 
-// --- PERSON ANALYSIS ---
+// --- PERSON ANALYSIS (Default Left View: MAP) ---
 async function analyzePerson(id) {
     document.getElementById('results-content').innerHTML = '';
     clearVisuals();
@@ -337,6 +333,7 @@ async function analyzePerson(id) {
     populateTimeline(works, person.name);
     
     if (person.place_of_birth) geocodeAndZoom(person.place_of_birth, person.name);
+    
     switchView('map');
 }
 
@@ -363,15 +360,13 @@ function renderPersonProfile(person, totalFilms) {
     const actionsDiv = document.getElementById('entity-actions');
     actionsDiv.innerHTML = '';
 
-    // Subtle Wishlist Icon Button
     const wishBtn = document.createElement('button');
     wishBtn.className = `btn-icon ${repData && repData.isWishlist ? 'active-wish' : ''}`;
     wishBtn.innerHTML = SVG_ICONS.bookmark;
-    wishBtn.title = repData && repData.isWishlist ? 'Remove from Wishlist' : 'Add to Wishlist / Saved';
+    wishBtn.title = repData && repData.isWishlist ? 'Remove from Wishlist' : 'Add to Wishlist';
     wishBtn.onclick = () => toggleEntityWishlist(person.id, cat, person.name);
     actionsDiv.appendChild(wishBtn);
 
-    // Subtle Pin to Repertoire Icon Button
     const repBtn = document.createElement('button');
     repBtn.className = `btn-icon ${repData ? 'active-pinned' : ''}`;
     repBtn.innerHTML = SVG_ICONS.pin;
@@ -380,7 +375,7 @@ function renderPersonProfile(person, totalFilms) {
     actionsDiv.appendChild(repBtn);
 }
 
-// --- MOVIE / SERIES ANALYSIS ---
+// --- MOVIE / SERIES ANALYSIS (Default Left View: TIMELINE with Highlighted Movie) ---
 async function analyzeMovie(id, mediaType = 'movie') {
     document.getElementById('results-content').innerHTML = '';
     clearVisuals();
@@ -408,27 +403,35 @@ async function analyzeMovie(id, mediaType = 'movie') {
 
     const director = credits.crew.find(c => c.job === 'Director');
     if (director) {
-        fetchAndPopulateDirectorTimeline(director);
+        fetchAndPopulateDirectorTimeline(director, movie.id);
     } else {
         const releaseDate = movie.release_date || movie.first_air_date;
         if (releaseDate) {
             document.getElementById('timeline-title').innerText = `TIMELINE: ${movie.title || movie.name}`;
-            timelineItems.add({ id: 'current_movie', movieId: movie.id, content: movie.title || movie.name, start: releaseDate, className: 'film-node' });
+            const year = releaseDate.split('-')[0];
+            timelineItems.add({
+                id: 'current_movie',
+                movieId: movie.id,
+                content: `<span class="tl-title">${movie.title || movie.name}</span> <span class="tl-year">(${year})</span>`,
+                start: releaseDate,
+                title: `🎬 ${movie.title || movie.name}\n📅 Release Date: ${releaseDate}`,
+                className: 'active-timeline-node'
+            });
             timeline.fit();
         }
     }
     
-    switchView('map');
+    switchView('timeline');
 }
 
-async function fetchAndPopulateDirectorTimeline(director) {
+async function fetchAndPopulateDirectorTimeline(director, highlightMovieId = null) {
     try {
         const credRes = await fetch(`https://api.themoviedb.org/3/person/${director.id}/movie_credits?api_key=${TMDB_API_KEY}`);
         const credits = await credRes.json();
         let works = credits.crew.filter(c => c.job === 'Director');
         
         document.getElementById('timeline-title').innerText = `DIRECTOR TIMELINE: ${director.name.toUpperCase()}`;
-        populateTimeline(works, director.name);
+        populateTimeline(works, director.name, highlightMovieId);
     } catch (e) { console.error('Error fetching director timeline'); }
 }
 
@@ -457,7 +460,6 @@ function renderMovieProfile(movie, mediaType) {
     const actionsDiv = document.getElementById('entity-actions');
     actionsDiv.innerHTML = '';
 
-    // IMDb Icon Link
     if (movie.imdb_id) {
         const imdbA = document.createElement('a');
         imdbA.href = `https://www.imdb.com/title/${movie.imdb_id}`;
@@ -468,7 +470,6 @@ function renderMovieProfile(movie, mediaType) {
         actionsDiv.appendChild(imdbA);
     }
 
-    // Watched Icon Button
     const isSeen = repData && repData.seen && repData.seen.includes(movie.id);
     const seenBtn = document.createElement('button');
     seenBtn.className = `btn-icon ${isSeen ? 'active-seen' : ''}`;
@@ -477,7 +478,6 @@ function renderMovieProfile(movie, mediaType) {
     seenBtn.onclick = () => toggleMovieSeen(movie.id, cat, movie.title || movie.name);
     actionsDiv.appendChild(seenBtn);
 
-    // Wishlist Icon Button
     const isWish = repData && repData.isWishlist;
     const wishBtn = document.createElement('button');
     wishBtn.className = `btn-icon ${isWish ? 'active-wish' : ''}`;
@@ -486,7 +486,6 @@ function renderMovieProfile(movie, mediaType) {
     wishBtn.onclick = () => toggleEntityWishlist(movie.id, cat, movie.title || movie.name);
     actionsDiv.appendChild(wishBtn);
 
-    // Subtle Add to Repertoire Icon Button
     const repBtn = document.createElement('button');
     repBtn.className = `btn-icon ${repData ? 'active-pinned' : ''}`;
     repBtn.innerHTML = SVG_ICONS.pin;
@@ -653,7 +652,7 @@ function renderCreatorsBreakdown(credits) {
     });
 }
 
-// --- LEFT SUB-INSPECTOR PANEL ---
+// --- SUB-INSPECTOR PANEL ---
 async function openSubInspectorPerson(personId, highlightMovieId) {
     const subPanel = document.getElementById('sub-inspector-panel');
     const container = document.getElementById('sub-panel-content');
@@ -708,7 +707,7 @@ async function openSubInspectorPerson(personId, highlightMovieId) {
                     <div class="film-item ${isHighlighted ? 'highlighted-film' : ''} ${isUpcoming ? 'upcoming-film' : ''}">
                         <div class="film-info">
                             <span class="film-year" onclick="jumpToYear('${w.release_date}')">${yearStr}</span>
-                            <span class="film-title" onclick="analyzeMovie(${w.id})">${w.title} ${isUpcoming ? '<span class="upcoming-badge">UPCOMING</span>' : ''} ${isHighlighted ? '◄ (ACTIVE)' : ''}</span>
+                            <span class="film-title" onclick="analyzeMovie(${w.id})">${w.title} ${isUpcoming ? '<span class="upcoming-badge-subtle">UPCOMING</span>' : ''} ${isHighlighted ? '◄ (ACTIVE)' : ''}</span>
                         </div>
                     </div>
                 `;
@@ -727,13 +726,12 @@ function closeSubInspector() {
     document.getElementById('sub-inspector-panel').style.display = 'none';
 }
 
-// --- TOGGLE UPCOMING MOVIES ---
+// --- TOGGLE DISCRETE UPCOMING MOVIES ---
 function toggleUpcoming() {
     showUpcoming = !showUpcoming;
     const btn = document.getElementById('upcoming-toggle-btn');
     if (btn) {
         btn.classList.toggle('active', showUpcoming);
-        btn.innerHTML = `🔮 <span>${showUpcoming ? 'HIDE FUTURE' : 'SHOW FUTURE'}</span>`;
     }
 
     if (currentEntity && currentEntity.works) {
@@ -798,7 +796,7 @@ function renderFilmographyList(works) {
 
         const titleSpan = document.createElement('span');
         titleSpan.className = 'film-title';
-        titleSpan.innerHTML = `${m.title} ${isUpcoming ? '<span class="upcoming-badge">UPCOMING</span>' : ''}`;
+        titleSpan.innerHTML = `${m.title} ${isUpcoming ? '<span class="upcoming-badge-subtle">UPCOMING</span>' : ''}`;
         titleSpan.onclick = () => analyzeMovie(m.id);
 
         infoDiv.appendChild(yearSpan);
@@ -828,7 +826,19 @@ function renderFilmographyList(works) {
     });
 }
 
-// --- REPERTOIRE & WISHLIST MANAGEMENT ---
+// --- REPERTOIRE & WISHLIST SPLIT SCREEN DRAWER ---
+function toggleWishlistDrawer() {
+    isWishlistDrawerOpen = !isWishlistDrawerOpen;
+    const col = document.getElementById('rep-wishlist-col');
+    const btn = document.getElementById('btn-toggle-wishlist');
+    
+    if (col && btn) {
+        col.classList.toggle('open', isWishlistDrawerOpen);
+        btn.classList.toggle('active-wish', isWishlistDrawerOpen);
+    }
+    renderWishlistDrawer();
+}
+
 function setRepertoireTab(cat) {
     activeRepertoireTab = cat;
     renderRepertoire();
@@ -855,7 +865,7 @@ function toggleFilmStatus(filmId, type) {
     if (!currentEntity || currentEntity.type !== 'person') return;
     
     const cat = getCategoryFromDepartment(currentEntity.job);
-    touchCategory(cat); // Updates recent order ONLY on modification
+    touchCategory(cat);
     
     let repItem = repertoire.find(r => r.id === currentEntity.id && r.category === cat);
     
@@ -957,8 +967,9 @@ function toggleRepertoireAttr(id, cat, attr) {
 }
 
 function saveRepertoire() {
-    localStorage.setItem('cinematicRepertoirePRO_v8', JSON.stringify(repertoire));
+    localStorage.setItem('cinematicRepertoirePRO_v9', JSON.stringify(repertoire));
     renderRepertoire();
+    renderWishlistDrawer();
 }
 
 function calculateScoreColor(seen, total) {
@@ -990,7 +1001,6 @@ function renderRepertoire() {
     let filtered = repertoire.filter(item => {
         if (item.category !== activeRepertoireTab) return false;
         if (visibility === 'main') return !item.hidden;
-        if (visibility === 'wishlist') return item.isWishlist && !item.hidden;
         if (visibility === 'hidden') return item.hidden;
         return true;
     });
@@ -1013,7 +1023,7 @@ function renderRepertoire() {
         const color = calculateScoreColor(item.seen.length, item.total);
         
         const div = document.createElement('div');
-        div.className = `repertoire-item ${item.pinned ? 'pinned' : ''} ${item.isWishlist ? 'wishlist-item' : ''} ${item.hidden ? 'hidden-item' : ''}`;
+        div.className = `repertoire-item ${item.pinned ? 'pinned' : ''} ${item.hidden ? 'hidden-item' : ''}`;
         div.style.borderLeftColor = isMedia ? 'var(--neon-blue)' : color;
         
         const infoDiv = document.createElement('div');
@@ -1023,8 +1033,7 @@ function renderRepertoire() {
             else analyzePerson(item.id);
         };
 
-        const wishlistTag = item.isWishlist ? ' <span style="color:var(--neon-yellow); font-size:9px;">🔖 WISHLIST</span>' : '';
-        const scoreText = isMedia ? wishlistTag : `<span class="rep-score" style="color:${color}">${item.seen.length} / ${item.total}${wishlistTag}</span>`;
+        const scoreText = isMedia ? '' : `<span class="rep-score" style="color:${color}">${item.seen.length} / ${item.total}</span>`;
         infoDiv.innerHTML = `<span class="rep-name">${item.name}</span>${scoreText}`;
 
         const actionsDiv = document.createElement('div');
@@ -1033,7 +1042,7 @@ function renderRepertoire() {
         const wishBtn = document.createElement('button');
         wishBtn.className = `btn-icon ${item.isWishlist ? 'active-wish' : ''}`;
         wishBtn.innerHTML = SVG_ICONS.bookmark;
-        wishBtn.title = item.isWishlist ? 'Remove Wishlist' : 'Add to Wishlist';
+        wishBtn.title = item.isWishlist ? 'Remove from Wishlist' : 'Add to Wishlist';
         wishBtn.onclick = (e) => { e.stopPropagation(); toggleRepertoireAttr(item.id, item.category, 'isWishlist'); };
 
         const pinBtn = document.createElement('button');
@@ -1058,7 +1067,55 @@ function renderRepertoire() {
     });
 }
 
-// --- HELPER FUNCTIONS ---
+function renderWishlistDrawer() {
+    const listDiv = document.getElementById('wishlist-list');
+    const badge = document.getElementById('wishlist-count-badge');
+    if (!listDiv) return;
+
+    listDiv.innerHTML = '';
+    const wishlistItems = repertoire.filter(item => item.isWishlist && !item.hidden);
+
+    if (badge) badge.textContent = `(${wishlistItems.length})`;
+
+    if (wishlistItems.length === 0) {
+        listDiv.innerHTML = `<p style="font-size:10px; color:#475569; text-align:center; margin-top:15px;">Wishlist is empty.</p>`;
+        return;
+    }
+
+    wishlistItems.forEach(item => {
+        const isMedia = item.category === 'movies' || item.category === 'series';
+        
+        const div = document.createElement('div');
+        div.className = 'repertoire-item';
+        div.style.borderLeftColor = 'var(--neon-yellow)';
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'rep-info';
+        infoDiv.onclick = () => {
+            if (isMedia) analyzeMovie(item.id, item.category === 'series' ? 'tv' : 'movie');
+            else analyzePerson(item.id);
+        };
+
+        infoDiv.innerHTML = `<span class="rep-name">${item.name}</span><span style="font-size:9px; color:#64748b; text-transform:uppercase;">${item.category}</span>`;
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'rep-actions';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn-icon active-wish';
+        removeBtn.innerHTML = SVG_ICONS.bookmark;
+        removeBtn.title = 'Remove from Wishlist';
+        removeBtn.onclick = (e) => { e.stopPropagation(); toggleRepertoireAttr(item.id, item.category, 'isWishlist'); };
+
+        actionsDiv.appendChild(removeBtn);
+
+        div.appendChild(infoDiv);
+        div.appendChild(actionsDiv);
+        listDiv.appendChild(div);
+    });
+}
+
+// --- HELPER FUNCTIONS FOR TIMELINE POPULATION ---
 function clearVisuals() {
     currentMarkers.forEach(m => m.remove());
     currentMarkers = [];
@@ -1075,7 +1132,7 @@ function jumpToYear(dateString) {
     );
 }
 
-function populateTimeline(works, groupName) {
+function populateTimeline(works, groupName, highlightMovieId = null) {
     timelineItems.clear();
     const currentYear = new Date().getFullYear();
 
@@ -1085,12 +1142,23 @@ function populateTimeline(works, groupName) {
 
         if (!isUpcoming || showUpcoming) {
             const startDate = m.release_date || `${currentYear + 2}-01-01`;
+            const yearStr = releaseYear ? releaseYear : 'TBA';
+            const isHighlighted = highlightMovieId && m.id === highlightMovieId;
+
+            let nodeClass = 'film-node';
+            if (isUpcoming) nodeClass = 'upcoming-node';
+            if (isHighlighted) nodeClass += ' active-timeline-node';
+
+            const fullDate = m.release_date ? m.release_date : 'Unknown release date';
+            const tooltipText = `🎬 ${m.title}\n📅 Release Date: ${fullDate}${isUpcoming ? ' (Upcoming)' : ''}`;
+
             timelineItems.add({
                 id: idx,
                 movieId: m.id,
-                content: `${m.title} ${isUpcoming ? '🔮' : ''}`,
+                content: `<span class="tl-title">${m.title}</span> <span class="tl-year">(${yearStr})</span>`,
                 start: startDate,
-                className: isUpcoming ? 'upcoming-node' : 'film-node'
+                title: tooltipText,
+                className: nodeClass
             });
         }
     });
