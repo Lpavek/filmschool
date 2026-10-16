@@ -12,6 +12,7 @@ let activeRepertoireTab = 'directors';
 let filmographySortOrder = 'desc';
 let showUpcoming = false;
 let isWishlistDrawerOpen = false;
+let lastTabWheelTime = 0;
 
 // Dynamic Tab Sorting State
 let tabSortMode = localStorage.getItem('cinematicTabSortMode') || 'recent';
@@ -175,7 +176,7 @@ function initResizers() {
     });
 }
 
-// --- REPERTOIRE TABS & SMOOTH WHEEL SCROLL FIX ---
+// --- REPERTOIRE TABS & WHEEL SCROLLING FIX ---
 function touchCategory(cat) {
     if (!categoryMeta[cat]) categoryMeta[cat] = {};
     categoryMeta[cat].lastAdded = Date.now();
@@ -237,11 +238,46 @@ function initTabsScroll() {
     if (!tabsContainer) return;
 
     tabsContainer.addEventListener('wheel', (e) => {
-        if (e.deltaY !== 0) {
-            e.preventDefault();
-            tabsContainer.scrollLeft += e.deltaY;
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastTabWheelTime < 180) return;
+
+        const activeButtons = Array.from(tabsContainer.querySelectorAll('.rep-tab-btn'));
+        const activeCats = activeButtons.map(b => b.dataset.cat);
+        
+        let idx = activeCats.indexOf(activeRepertoireTab);
+        if (e.deltaY > 0 && idx < activeCats.length - 1) {
+            setRepertoireTab(activeCats[idx + 1]);
+            lastTabWheelTime = now;
+        } else if (e.deltaY < 0 && idx > 0) {
+            setRepertoireTab(activeCats[idx - 1]);
+            lastTabWheelTime = now;
         }
     }, { passive: false });
+}
+
+function setRepertoireTab(cat) {
+    activeRepertoireTab = cat;
+    renderTabs();
+    renderRepertoire();
+    renderWishlistDrawer();
+    updateWishlistBadge();
+
+    const activeBtn = document.querySelector(`.rep-tab-btn[data-cat="${cat}"]`);
+    if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+}
+
+// --- DYNAMIC WISHLIST BADGE BUBBLE ---
+function updateWishlistBadge() {
+    const badge = document.getElementById('wishlist-badge');
+    if (!badge) return;
+    const currentCatWishCount = repertoire.filter(r => r.category === activeRepertoireTab && r.isWishlist && !r.hidden).length;
+    if (currentCatWishCount > 0) {
+        badge.textContent = currentCatWishCount;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
 }
 
 // --- VIEW SWITCHER ---
@@ -414,7 +450,7 @@ async function analyzeMovie(id, mediaType = 'movie') {
                 movieId: movie.id,
                 content: `<span class="tl-title">${movie.title || movie.name}</span> <span class="tl-year">(${year})</span>`,
                 start: releaseDate,
-                title: `🎬 ${movie.title || movie.name}\n📅 Release Date: ${releaseDate}`,
+                title: `${movie.title || movie.name} (${year})`,
                 className: 'active-timeline-node'
             });
             timeline.fit();
@@ -839,11 +875,6 @@ function toggleWishlistDrawer() {
     renderWishlistDrawer();
 }
 
-function setRepertoireTab(cat) {
-    activeRepertoireTab = cat;
-    renderRepertoire();
-}
-
 function autoSwitchRepertoireTab(department) {
     const cat = getCategoryFromDepartment(department);
     setRepertoireTab(cat);
@@ -970,6 +1001,7 @@ function saveRepertoire() {
     localStorage.setItem('cinematicRepertoirePRO_v9', JSON.stringify(repertoire));
     renderRepertoire();
     renderWishlistDrawer();
+    updateWishlistBadge();
 }
 
 function calculateScoreColor(seen, total) {
@@ -1015,6 +1047,7 @@ function renderRepertoire() {
 
     if (filtered.length === 0) {
         listDiv.innerHTML = `<p style="font-size:11px; color:#475569; text-align:center; margin-top:10px;">No items in this tab.</p>`;
+        updateWishlistBadge();
         return;
     }
 
@@ -1065,6 +1098,8 @@ function renderRepertoire() {
         div.appendChild(actionsDiv);
         listDiv.appendChild(div);
     });
+
+    updateWishlistBadge();
 }
 
 function renderWishlistDrawer() {
@@ -1073,12 +1108,12 @@ function renderWishlistDrawer() {
     if (!listDiv) return;
 
     listDiv.innerHTML = '';
-    const wishlistItems = repertoire.filter(item => item.isWishlist && !item.hidden);
+    const wishlistItems = repertoire.filter(item => item.category === activeRepertoireTab && item.isWishlist && !item.hidden);
 
     if (badge) badge.textContent = `(${wishlistItems.length})`;
 
     if (wishlistItems.length === 0) {
-        listDiv.innerHTML = `<p style="font-size:10px; color:#475569; text-align:center; margin-top:15px;">Wishlist is empty.</p>`;
+        listDiv.innerHTML = `<p style="font-size:10px; color:#475569; text-align:center; margin-top:15px;">No saved items for ${activeRepertoireTab.toUpperCase()}.</p>`;
         return;
     }
 
@@ -1149,15 +1184,12 @@ function populateTimeline(works, groupName, highlightMovieId = null) {
             if (isUpcoming) nodeClass = 'upcoming-node';
             if (isHighlighted) nodeClass += ' active-timeline-node';
 
-            const fullDate = m.release_date ? m.release_date : 'Unknown release date';
-            const tooltipText = `🎬 ${m.title}\n📅 Release Date: ${fullDate}${isUpcoming ? ' (Upcoming)' : ''}`;
-
             timelineItems.add({
                 id: idx,
                 movieId: m.id,
                 content: `<span class="tl-title">${m.title}</span> <span class="tl-year">(${yearStr})</span>`,
                 start: startDate,
-                title: tooltipText,
+                title: `${m.title} (${yearStr})`,
                 className: nodeClass
             });
         }
