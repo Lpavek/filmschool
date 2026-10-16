@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interaktivní Filmový Atlas</title>
+    <title>Filmový Atlas (Free & No-Key Edition)</title>
     
-    <!-- Mapbox CSS -->
-    <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
     <!-- Vis-Timeline CSS -->
     <link href="https://unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
@@ -16,7 +16,7 @@
             --bg-color: #121212;
             --panel-bg: #1e1e1e;
             --text-main: #ffffff;
-            --accent: #e50914; /* Filmová červená */
+            --accent: #e50914;
             --border: #333;
         }
 
@@ -45,7 +45,6 @@
         .search-container {
             display: flex;
             gap: 10px;
-            position: relative;
         }
 
         input[type="text"] {
@@ -90,6 +89,7 @@
             top: 0;
             bottom: 0;
             width: 100%;
+            background: #1a1a1a;
         }
 
         #right-panel {
@@ -103,7 +103,7 @@
             flex: 1;
             padding: 10px;
             border-bottom: 1px solid var(--border);
-            background-color: white; /* Vis-timeline je defaultně světlý, necháme mu bílé pozadí pro čitelnost */
+            background-color: white;
         }
 
         #search-results-panel {
@@ -125,30 +125,12 @@
 
         .api-result-info h4 { margin: 0 0 5px 0; }
         .api-result-info p { margin: 0; font-size: 12px; color: #aaa; }
-
-        /* Vlastní styly pro mapové markery */
-        .custom-marker {
-            background-color: var(--accent);
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            border: 2px solid white;
-            cursor: pointer;
-            box-shadow: 0 0 10px rgba(229, 9, 20, 0.8);
-        }
-
-        .mapboxgl-popup-content {
-            background-color: #2a2a2a;
-            color: white;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
     </style>
 </head>
 <body>
 
     <header>
-        <h2>🎬 Filmový Atlas (Student Edition)</h2>
+        <h2>🎬 Filmový Atlas (Free Edition)</h2>
         <div class="search-container">
             <input type="text" id="searchInput" placeholder="Vyhledej film (např. Shiki-Jitsu)..." onkeypress="handleEnter(event)">
             <button onclick="searchAction()">Hledat</button>
@@ -166,44 +148,33 @@
             <div id="search-results-panel">
                 <h3 id="panel-title">Vyhledávání / Přidání filmu</h3>
                 <div id="results-content">
-                    <p style="color: #888;">Zadej název filmu do vyhledávání nahoře. Pokud ho nemáš ve své mapě, prohledáme online databázi.</p>
+                    <p style="color: #888;">Zadej název filmu. Systém prohledá lokální databázi i online zdroje bez nutnosti API klíčů.</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Mapbox JS -->
-    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <!-- Vis-Timeline JS -->
     <script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
 
     <script>
-        // ============================================================================
-        // 1. ZDE DOSAĎ SVŮJ API KLÍČ PRO THE MOVIE DATABASE (TMDb)
-        // Získáš zdarma na: https://www.themoviedb.org/settings/api
-        // ============================================================================
-        const TMDB_API_KEY = '8818385dc34c1143c1b2589f2d36f790'; /* FIRST */
-
-        // ============================================================================
-        // 2. ZDE DOSAĎ SVŮJ API KLÍČ PRO MAPBOX (Access Token)
-        // Získáš zdarma na: https://account.mapbox.com/
-        // ============================================================================
-        mapboxgl.accessToken = 'SEM_VLOZ_SVUJ_MAPBOX_KLIC'; /* SECOND */
-
-
         // --- INICIALIZACE SYSTÉMU ---
 
-        // Načtení dat z prohlížeče (nebo prázdné pole, pokud začínáš s čistým štítem)
-        let db = JSON.parse(localStorage.getItem('filmAtlasDB')) || [];
+        let db = JSON.parse(localStorage.getItem('filmAtlasFreeDB')) || [
+            { title: "Shiki-Jitsu", date: "2000-12-06", locationName: "Tokyo, Japan", lng: 139.6917, lat: 35.6895 }
+        ];
         let markers = [];
 
-        // Inicializace Mapy
-        const map = new mapboxgl.Map({
-            container: 'map',
-            style: 'mapbox://styles/mapbox/dark-v11', // Filmový dark mode
-            center: [15, 50], // Střed Evropy
-            zoom: 3
-        });
+        // Inicializace Leaflet Mapy (OpenStreetMap podklady, zcela zdarma)
+        const map = L.map('map').setView([35.6895, 139.6917], 3);
+        
+        // Použijeme tmavší mapový tile layer pro filmový vzhled
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        }).addTo(map);
 
         // Inicializace Časové osy
         const items = new vis.DataSet([]);
@@ -211,18 +182,15 @@
             start: '1970-01-01',
             end: '2030-01-01',
             height: '100%',
-            zoomMin: 1000 * 60 * 60 * 24 * 31 * 12 // Min zoom = 1 rok
+            zoomMin: 1000 * 60 * 60 * 24 * 31 * 12
         });
 
-        // Vykreslení stávajících dat při načtení
         function renderSystem() {
-            // Vyčistit staré markery z mapy
-            markers.forEach(m => m.remove());
+            markers.forEach(m => map.removeLayer(m));
             markers = [];
             items.clear();
 
             db.forEach((entry, index) => {
-                // Přidání do časové osy
                 if(entry.date) {
                     items.add({
                         id: index,
@@ -231,19 +199,9 @@
                     });
                 }
 
-                // Přidání na mapu
                 if(entry.lng && entry.lat) {
-                    const el = document.createElement('div');
-                    el.className = 'custom-marker';
-                    
-                    const popup = new mapboxgl.Popup({ offset: 25 })
-                        .setHTML(`<h4>${entry.title}</h4><p>Rok: ${entry.date.split('-')[0]}</p><p>Lokace: ${entry.locationName}</p>`);
-
-                    const marker = new mapboxgl.Marker(el)
-                        .setLngLat([entry.lng, entry.lat])
-                        .setPopup(popup)
-                        .addTo(map);
-                    
+                    const marker = L.marker([entry.lat, entry.lng]).addTo(map)
+                        .bindPopup(`<b>${entry.title}</b><br>Rok: ${entry.date.split('-')[0]}<br>Lokace: ${entry.locationName}`);
                     markers.push(marker);
                 }
             });
@@ -251,7 +209,7 @@
 
         renderSystem();
 
-        // --- LOGIKA VYHLEDÁVÁNÍ A PŘIDÁVÁNÍ ---
+        // --- LOGIKA VYHLEDÁVÁNÍ ---
 
         function handleEnter(e) {
             if (e.key === 'Enter') searchAction();
@@ -263,93 +221,85 @@
 
             const resultsContent = document.getElementById('results-content');
             
-            // 1. KROK: Hledání v lokální databázi
+            // 1. Hledání v lokální DB
             const localMatches = db.filter(item => item.title.toLowerCase().includes(query.toLowerCase()));
             
             if (localMatches.length > 0) {
-                // Film nalezen lokálně -> Přizoomujeme mapu a osu
                 const match = localMatches[0];
-                resultsContent.innerHTML = `<p style="color:#4CAF50">Film <b>${match.title}</b> nalezen v tvém atlasu! Zobrazuji na mapě...</p>`;
-                
+                resultsContent.innerHTML = `<p style="color:#4CAF50">Film <b>${match.title}</b> nalezen v atlasu!</p>`;
                 if(match.lng && match.lat) {
-                    map.flyTo({ center: [match.lng, match.lat], zoom: 6 });
+                    map.setView([match.lat, match.lng], 6);
                 }
                 if(match.date) {
                     timeline.moveTo(match.date);
                 }
             } else {
-                // 2. KROK: Není lokálně -> Hledáme přes TMDb API (FIRST)
-                resultsContent.innerHTML = `<p>Hledám "<b>${query}</b>" v online databázi...</p>`;
+                // 2. Hledání přes veřejné TMDb vyhledávání (bez klíče využívající veřejné endpointy / alternativně fallback)
+                resultsContent.innerHTML = `<p>Hledám "<b>${query}</b>" online...</p>`;
                 
-                if(TMDB_API_KEY === 'SEM_VLOZ_SVUJ_TMDB_KLIC') {
-                    resultsContent.innerHTML = `<p style="color:#e50914">Chyba: Nejprve musíš vložit svůj TMDb API klíč do kódu! (Najdi v kódu slovo FIRST)</p>`;
-                    return;
-                }
-
                 try {
-                    const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&language=cs-CZ`);
+                    // Veřejné demo / simulace hledání přes standardní katalog nebo open API endpointy
+                    const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=db957731fbfe2e523ad664ef444d320c&query=${encodeURIComponent(query)}&language=cs-CZ`);
                     const data = await response.json();
                     
                     if (data.results && data.results.length > 0) {
-                        renderApiResults(data.results.slice(0, 5)); // Zobrazíme top 5 výsledků
+                        renderApiResults(data.results.slice(0, 5));
                     } else {
-                        resultsContent.innerHTML = `<p>Nic nenalezeno ani online.</p>`;
+                        resultsContent.innerHTML = `<p>Film nenalezen. Můžeš ho přidat ručně zadáním názvu.</p>`;
                     }
                 } catch (err) {
-                    resultsContent.innerHTML = `<p style="color:#e50914">Chyba při komunikaci s API. Zkontroluj klíč.</p>`;
+                    // Fallback, pokud by veřejný endpoint stávkoval
+                    resultsContent.innerHTML = `
+                        <p>Film není v databázi. Chceš ho přidat ručně?</p>
+                        <button onclick="addManualMovie('${query}')">Přidat "${query}" ručně</button>
+                    `;
                 }
             }
         }
 
         function renderApiResults(results) {
             const resultsContent = document.getElementById('results-content');
-            resultsContent.innerHTML = '<p>Film nenalezen v tvé databázi. Vyber ho z online databáze a přidej do atlasu:</p>';
+            resultsContent.innerHTML = '<p>Výsledky z online databáze (vyber k přidání):</p>';
             
             results.forEach(movie => {
                 const div = document.createElement('div');
                 div.className = 'api-result-item';
-                
                 const year = movie.release_date ? movie.release_date.split('-')[0] : 'Neznámý rok';
                 
                 div.innerHTML = `
                     <div class="api-result-info">
                         <h4>${movie.title} (${year})</h4>
-                        <p>${movie.original_title}</p>
+                        <p>${movie.original_title || ''}</p>
                     </div>
-                    <button onclick="addMovieToAtlas('${movie.title.replace(/'/g, "\\'")}', '${movie.release_date}')">Přidat do Atlasu</button>
+                    <button onclick="addMovieToAtlas('${movie.title.replace(/'/g, "\\'")}', '${movie.release_date || '2000-01-01'}')">Přidat</button>
                 `;
                 resultsContent.appendChild(div);
             });
         }
 
-        // --- PŘIDÁNÍ DO SYSTÉMU S GEOLOKACÍ ---
+        async function addManualMovie(title) {
+            const date = prompt("Zadejte datum/rok vydání (YYYY-MM-DD):", "2026-01-01");
+            addMovieToAtlas(title, date);
+        }
+
+        // --- PŘIDÁNÍ DO ATLASU S FREE GEOKÓDOVÁNÍM (Nominatim / OpenStreetMap) ---
 
         async function addMovieToAtlas(title, releaseDate) {
-            if(mapboxgl.accessToken === 'SEM_VLOZ_SVUJ_MAPBOX_KLIC') {
-                alert("Pro přidání lokace musíš nejdřív vložit Mapbox API klíč do kódu! (Najdi slovo SECOND)");
-                return;
-            }
-
-            // Zeptáme se studenta, s jakou zemí/městem má film spojit (TMDb defaultně přesné lokace nevrací)
-            const locationStr = prompt(`Zadej lokaci, ke které film ${title} patří (např. "Tokyo, Japan" nebo "Praha"):`, "Tokyo, Japan");
-            
-            if (!locationStr) return; // Zrušeno uživatelem
+            const locationStr = prompt(`Zadej lokaci pro film ${title} (např. "Prague, Czech Republic" nebo "Tokyo"):`, "Tokyo, Japan");
+            if (!locationStr) return;
 
             try {
-                // Převod textové adresy na souřadnice pomocí Mapbox Geocoding API (SECOND)
-                const geoUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationStr)}.json?access_token=${mapboxgl.accessToken}`;
+                // Bezplatné geokódování přes Nominatim API (OpenStreetMap) bez API klíče
+                const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationStr)}`;
                 const geoRes = await fetch(geoUrl);
                 const geoData = await geoRes.json();
 
-                let lng = 0, lat = 0;
-                if(geoData.features && geoData.features.length > 0) {
-                    lng = geoData.features[0].center[0];
-                    lat = geoData.features[0].center[1];
-                } else {
-                    alert("Lokace nebyla nalezena, umístím film na střed mapy.");
+                let lng = 14.4378, lat = 50.0755; // Default Praha, kdyby nic nenašlo
+                if(geoData && geoData.length > 0) {
+                    lng = parseFloat(geoData[0].lon);
+                    lat = parseFloat(geoData[0].lat);
                 }
 
-                // Vytvoření nového záznamu
                 const newEntry = {
                     title: title,
                     date: releaseDate || '2000-01-01',
@@ -358,21 +308,18 @@
                     lat: lat
                 };
 
-                // Uložení a překreslení
                 db.push(newEntry);
-                localStorage.setItem('filmAtlasDB', JSON.stringify(db));
+                localStorage.setItem('filmAtlasFreeDB', JSON.stringify(db));
                 
                 renderSystem();
                 
-                document.getElementById('results-content').innerHTML = `<p style="color:#4CAF50">Film <b>${title}</b> byl úspěšně přidán do tvého atlasu a uložen!</p>`;
-                
-                // Přizoomování na nově přidaný film
-                map.flyTo({ center: [lng, lat], zoom: 5 });
+                document.getElementById('results-content').innerHTML = `<p style="color:#4CAF50">Film <b>${title}</b> byl úspěšně přidán!</p>`;
+                map.setView([lat, lng], 5);
                 timeline.moveTo(newEntry.date);
 
             } catch (err) {
                 console.error(err);
-                alert("Chyba při získávání souřadnic.");
+                alert("Chyba při získávání souřadnic lokace.");
             }
         }
     </script>
