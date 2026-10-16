@@ -1,0 +1,465 @@
+const TMDB_API_KEY = '8818385dc34c1143c1b2589f2d36f790';
+mapboxgl.accessToken = 'pk.eyJ1IjoibHVxcWV5IiwiYSI6ImNtdmF4MXg3OTA4c3oyeXI0aTgzNnM5MW4ifQ.ZoG892NR3JW26wh-ZGdPRg';
+
+// Globální stavy
+let map, timeline, network;
+let timelineItems = new vis.DataSet([]);
+let nodes = new vis.DataSet([]);
+let edges = new vis.DataSet([]);
+let currentMarkers = [];
+let currentEntity = null; // Aktuálně zobrazená osoba nebo film
+let isRotating = true;
+let mapIdleTimer;
+
+// Inicializace repertoáru: formát [{ id, name, type: 'person', job: 'Director', total: 10, seen: ['id1', 'id2'], pinned: false, hidden: false }]
+let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO')) || [];
+
+function initApp() {
+    // 1. Mapbox (3D Globe)
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: [15, 45],
+        zoom: 1.8,
+        projection: 'globe'
+    });
+
+    map.on('style.load', () => { map.setFog({}); });
+    
+    // Idle logika mapy
+    const resetIdle = () => {
+        isRotating = false;
+        clearTimeout(mapIdleTimer);
+        mapIdleTimer = setTimeout(() => { isRotating = true; rotateGlobe(); }, 12000); // 12 sekund nečinnost
+    };
+    ['mousedown', 'touchstart', 'wheel', 'dragstart', 'zoomstart'].forEach(e => map.on(e, resetIdle));
+    map.on('moveend', () => { if(isRotating) rotateGlobe(); });
+    rotateGlobe();
+
+    // 2. Timeline
+    timeline = new vis.Timeline(document.getElementById('timeline-container'), timelineItems, {
+        start: '1970-01-01', end: '2030-01-01', height: '100%', zoomMin: 1000 * 60 * 60 * 24 * 365,
+    });
+
+    // 3. Node Network (Fusion style)
+    const netContainer = document.getElementById('network-container');
+    const netData = { nodes: nodes, edges: edges };
+    const netOptions = {
+        nodes: {
+            shape: 'box',
+            color: { background: '#2b2b2b', border: '#555', highlight: { background: '#444', border: '#FF6600' } },
+            font: { color: '#E0E0E0', face: 'monospace', size: 14 },
+            borderWidth: 2, borderRadius: 4, margin: 10
+        },
+        edges: {
+            width: 2, color: { color: '#666', highlight: '#FF6600' },
+            smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
+            arrows: 'to'
+        },
+        layout: { hierarchical: { direction: 'LR', sortMethod: 'directed', nodeSpacing: 150, levelSeparation: 250 } },
+        physics: false
+    };
+    network = new vis.Network(netContainer, netData, netOptions);
+    
+    // Interakce v grafu: Kliknutí na tvůrce ho vyhledá
+    network.on("selectNode", function (params) {
+        const nodeId = params.nodes[0];
+        const node = nodes.get(nodeId);
+        if (node && node.personId) analyzePerson(node.personId);
+    });
+
+    renderRepertoire();
+}
+
+function rotateGlobe() {
+    if (!isRotating) return;
+    if (map.getZoom() < 3) { // netočí se, pokud je uživatel zazoomovaný
+        const center = map.getCenter();
+        center.lng -= 0.1;
+        map.easeTo({ center, duration: 200, easing: n => n });
+    }
+}
+
+// --- PŘEPÍNÁNÍ POHLEDŮ ---
+function switchView(view) {
+    document.querySelectorAll('.view-toggles button').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${view}`).classList.add('active');
+    
+    document.getElementById('map').style.display = 'none';
+    document.getElementById('timeline-view').style.display = 'none';
+    document.getElementById('network-view').style.display = 'none';
+
+    document.getElementById(view === 'map' ? 'map' : `${view}-view`).style.display = 'block';
+    
+    if(view === 'map') map.resize();
+    if(view === 'timeline') timeline.redraw();
+    if(view === 'network') network.fit();
+}
+
+// --- VYHLEDÁVÁNÍ (Multisearch: Filmy + Lidé) ---
+function handleEnter(e) { if (e.key === 'Enter') searchAction(); }
+
+async function searchAction() {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) return;
+
+    const resDiv = document.getElementById('results-content');
+    resDiv.innerHTML = `<p class="neon-text">Querying TMDB...</p>`;
+    document.getElementById('entity-profile').style.display = 'none';
+    document.getElementById('filmography-section').style.display = 'none';
+
+    try {
+        const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        
+        const filtered = data.results.filter(r => r.media_type === 'person' || r.media_type === 'movie').slice(0, 5);
+        if (filtered.length > 0) {
+            resDiv.innerHTML = '';
+            filtered.forEach(item => {
+                const title = item.media_type === 'movie' ? item.title : item.name;
+                const typeLabel = item.media_type === 'movie' ? '🎬 Film' : '👤 Person';
+                const div = document.createElement('div');
+                div.className = 'film-item';
+                div.innerHTML = `
+                    <div class="film-info"><strong class="neon-text">${title}</strong> <span style="font-size:10px;color:#888;">(${typeLabel})</span></div>
+                    <button class="action-btn" onclick="item.media_type === 'movie' ? analyzeMovie(${item.id}) : analyzePerson(${item.id})">Analyze</button>
+                `;
+                resDiv.appendChild(div);
+            });
+        } else { resDiv.innerHTML = `<p>No matches found.</p>`; }
+    } catch (err) { resDiv.innerHTML = `<p style="color:red;">Error fetching data.</p>`; }
+}
+
+// --- OSOBY (Režiséři, Střihači, Herci...) ---
+async function analyzePerson(id) {
+    document.getElementById('results-content').innerHTML = '';
+    clearVisuals();
+    
+    const detRes = await fetch(`https://api.themoviedb.org/3/person/${id}?api_key=${TMDB_API_KEY}`);
+    const person = await detRes.json();
+    
+    const credRes = await fetch(`https://api.themoviedb.org/3/person/${id}/movie_credits?api_key=${TMDB_API_KEY}`);
+    const credits = await credRes.json();
+
+    // Sjednotíme filmy podle primární profese. Pokud je to Actor, bereme "cast", jinak "crew" (Director, Editor atd.)
+    let works = [];
+    if (person.known_for_department === 'Acting') { works = credits.cast; } 
+    else { works = credits.crew.filter(c => c.department === person.known_for_department); }
+    
+    // Unikátní filmy a sort
+    works = Array.from(new Map(works.filter(w => w.release_date).map(item => [item.id, item])).values())
+            .sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
+
+    currentEntity = { type: 'person', id: person.id, name: person.name, job: person.known_for_department, works: works };
+
+    renderPersonProfile(person, works.length);
+    renderFilmographyList(works, 'person');
+    populateTimeline(works, person.name);
+    
+    // Zoom mapy na místo narození
+    if (person.place_of_birth) geocodeAndZoom(person.place_of_birth);
+    
+    document.getElementById('btn-network').style.display = 'none';
+    switchView('map');
+}
+
+function renderPersonProfile(person, totalFilms) {
+    document.getElementById('entity-profile').style.display = 'block';
+    document.getElementById('entity-name').innerText = person.name;
+    
+    const imgEl = document.getElementById('entity-photo');
+    imgEl.src = person.profile_path ? `https://image.tmdb.org/t/p/w200${person.profile_path}` : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+    
+    // Vykreslení jen existujících dat (bez N/A)
+    let detailsHtml = '';
+    if (person.known_for_department) detailsHtml += `<div><span class="label">Profession:</span> ${person.known_for_department}</div>`;
+    if (person.birthday) detailsHtml += `<div><span class="label">Born:</span> ${person.birthday}</div>`;
+    if (person.deathday) detailsHtml += `<div><span class="label">Died:</span> ${person.deathday}</div>`;
+    if (person.place_of_birth) detailsHtml += `<div><span class="label">Location:</span> <span class="interactive-link" onclick="geocodeAndZoom('${person.place_of_birth.replace(/'/g, "\\'")}')">${person.place_of_birth}</span></div>`;
+    if (totalFilms > 0) detailsHtml += `<div><span class="label">Total works:</span> ${totalFilms}</div>`;
+    
+    document.getElementById('entity-details').innerHTML = detailsHtml;
+    document.getElementById('entity-bio').innerText = person.biography || '';
+    
+    // Tlačítko přidání
+    const existing = repertoire.find(r => r.id === person.id);
+    document.getElementById('entity-actions').innerHTML = `
+        <button class="btn-icon" title="${existing ? 'In Repertoire' : 'Add to Repertoire'}" onclick="forceAddToRepertoire()" style="width: auto; padding: 0 10px;">
+            ${existing ? '📌 Added' : '+ Add'}
+        </button>
+    `;
+}
+
+// --- FILMY (Zobrazení filmového profilu a Nodů) ---
+async function analyzeMovie(id) {
+    document.getElementById('results-content').innerHTML = '';
+    clearVisuals();
+    
+    const detRes = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${TMDB_API_KEY}`);
+    const movie = await detRes.json();
+    
+    const credRes = await fetch(`https://api.themoviedb.org/3/movie/${id}/credits?api_key=${TMDB_API_KEY}`);
+    const credits = await credRes.json();
+
+    currentEntity = { type: 'movie', id: movie.id, title: movie.title };
+
+    renderMovieProfile(movie, credits);
+    
+    // Mapování lokací natáčení (země produkce)
+    if(movie.production_countries && movie.production_countries.length > 0) {
+        movie.production_countries.forEach(c => geocodeAndAddMarker(c.name, movie.title));
+    }
+
+    // Timeline - vyznačí aktuální film oranžovou čárou
+    timeline.addCustomTime(movie.release_date, 'movie-release');
+    
+    buildMovieNetwork(movie, credits);
+    
+    document.getElementById('btn-network').style.display = 'block';
+    switchView('network');
+}
+
+function renderMovieProfile(movie, credits) {
+    document.getElementById('entity-profile').style.display = 'block';
+    document.getElementById('filmography-section').style.display = 'none'; // U filmu schováme list
+    document.getElementById('entity-name').innerText = movie.title;
+    
+    const imgEl = document.getElementById('entity-photo');
+    imgEl.src = movie.poster_path ? `https://image.tmdb.org/t/p/w200${movie.poster_path}` : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+    
+    const year = movie.release_date ? movie.release_date.split('-')[0] : '';
+    const genres = movie.genres ? movie.genres.map(g => g.name).join(', ') : '';
+    
+    let detailsHtml = `<div><span class="label">Year:</span> <span class="interactive-link" onclick="timeline.setWindow('${year}-01-01', '${parseInt(year)+1}-01-01'); switchView('timeline');">${year}</span></div>`;
+    if(movie.runtime) detailsHtml += `<div><span class="label">Runtime:</span> ${movie.runtime} min</div>`;
+    if(genres) detailsHtml += `<div><span class="label">Genres:</span> ${genres}</div>`;
+    
+    // IMDb link
+    if (movie.imdb_id) {
+        document.getElementById('entity-actions').innerHTML = `<a href="https://www.imdb.com/title/${movie.imdb_id}" target="_blank" class="btn-icon imdb-link" title="IMDb">🔗</a>`;
+    } else {
+        document.getElementById('entity-actions').innerHTML = '';
+    }
+
+    document.getElementById('entity-details').innerHTML = detailsHtml;
+    document.getElementById('entity-bio').innerText = movie.overview || '';
+}
+
+function buildMovieNetwork(movie, credits) {
+    nodes.clear(); edges.clear();
+    
+    // Centrální node (Film)
+    nodes.add({ id: 'm', label: movie.title, level: 2, color: { background: '#111', border: '#FF6600' }, font: { size: 18, color: '#FF6600' }});
+    
+    // Vytažení specifických rolí (Priorita Kamera, Střih, Režie)
+    const addNode = (crewMember, role, level) => {
+        if(!crewMember) return;
+        const nId = `p_${crewMember.id}_${role.replace(/\s/g,'')}`;
+        if(!nodes.get(nId)) {
+            nodes.add({ id: nId, label: `${role}\n${crewMember.name}`, level: level, personId: crewMember.id });
+            edges.add({ from: nId, to: 'm' });
+        }
+    };
+
+    const dir = credits.crew.find(c => c.job === 'Director'); addNode(dir, 'Director', 1);
+    const dop = credits.crew.find(c => c.department === 'Camera'); addNode(dop, 'Cinematography', 1);
+    const ed = credits.crew.find(c => c.department === 'Editing'); addNode(ed, 'Editor', 3);
+    const wr = credits.crew.find(c => c.department === 'Writing'); addNode(wr, 'Writer', 1);
+    const mus = credits.crew.find(c => c.job === 'Original Music Composer' || c.department === 'Sound'); addNode(mus, 'Music', 3);
+    
+    // Top 3 Herci
+    credits.cast.slice(0,3).forEach((actor, i) => {
+        const nId = `a_${actor.id}`;
+        nodes.add({ id: nId, label: `Cast\n${actor.name}`, level: 0, personId: actor.id, color: { background: '#1a1a2e', border: '#5c5cff' } });
+        edges.add({ from: nId, to: 'm' });
+    });
+}
+
+// --- VÝPIS FILMOGRAFIE (S checkboxy) ---
+function renderFilmographyList(works, type) {
+    const listDiv = document.getElementById('filmography-list');
+    document.getElementById('filmography-section').style.display = 'block';
+    listDiv.innerHTML = '';
+    
+    const repData = repertoire.find(r => r.id === currentEntity.id);
+    const seenArray = repData ? repData.seen : [];
+    const wishArray = repData ? repData.wish : [];
+
+    works.forEach(m => {
+        const year = m.release_date ? m.release_date.split('-')[0] : '????';
+        const isSeen = seenArray.includes(m.id);
+        const isWish = wishArray && wishArray.includes(m.id);
+
+        const div = document.createElement('div');
+        div.className = 'film-item';
+        div.innerHTML = `
+            <div class="film-info">
+                <span class="film-year" onclick="jumpToYear('${m.release_date}')" title="Show on Timeline">${year}</span>
+                <span class="film-title" onclick="analyzeMovie(${m.id})">${m.title}</span>
+            </div>
+            <div class="film-actions">
+                <button class="btn-icon ${isSeen ? 'active-seen' : ''}" onclick="toggleFilmStatus(${m.id}, 'seen')" title="Seen">✓</button>
+                <button class="btn-icon ${isWish && !isSeen ? 'active-wish' : ''}" onclick="toggleFilmStatus(${m.id}, 'wish')" title="Wishlist">O</button>
+            </div>
+        `;
+        listDiv.appendChild(div);
+    });
+}
+
+// --- REPERTOÁR LOGIKA ---
+function toggleFilmStatus(filmId, type) {
+    if (currentEntity.type !== 'person') return;
+    
+    let repItem = repertoire.find(r => r.id === currentEntity.id);
+    
+    // Pokud tvůrce není v repertoáru, automaticky ho přidáme
+    if (!repItem) {
+        repItem = { id: currentEntity.id, name: currentEntity.name, total: currentEntity.works.length, seen: [], wish: [], pinned: false, hidden: false };
+        repertoire.push(repItem);
+    } else {
+        // Aktualizujeme počet total děl pro jistotu (mohl vydat nový film)
+        repItem.total = currentEntity.works.length;
+    }
+
+    if (type === 'seen') {
+        if (repItem.seen.includes(filmId)) repItem.seen = repItem.seen.filter(id => id !== filmId);
+        else { repItem.seen.push(filmId); repItem.wish = (repItem.wish||[]).filter(id => id !== filmId); } // Odeber z wishe pokud viděno
+    } else if (type === 'wish') {
+        if (!repItem.wish) repItem.wish = [];
+        if (repItem.wish.includes(filmId)) repItem.wish = repItem.wish.filter(id => id !== filmId);
+        else { repItem.wish.push(filmId); repItem.seen = repItem.seen.filter(id => id !== filmId); } // Odeber ze seen
+    }
+
+    saveRepertoire();
+    renderFilmographyList(currentEntity.works, 'person'); // Re-render seznamu
+}
+
+function forceAddToRepertoire() {
+    if (!currentEntity || currentEntity.type !== 'person') return;
+    if (!repertoire.find(r => r.id === currentEntity.id)) {
+        repertoire.push({ id: currentEntity.id, name: currentEntity.name, total: currentEntity.works.length, seen: [], wish: [], pinned: false, hidden: false });
+        saveRepertoire();
+        renderPersonProfile(currentEntity, currentEntity.works.length); // re-render pro update tlačítka
+    }
+}
+
+function toggleRepertoireAttr(id, attr) {
+    const item = repertoire.find(r => r.id === id);
+    if(item) {
+        item[attr] = !item[attr];
+        saveRepertoire();
+    }
+}
+
+function saveRepertoire() {
+    localStorage.setItem('cinematicRepertoirePRO', JSON.stringify(repertoire));
+    renderRepertoire();
+}
+
+function calculateScoreColor(seen, total) {
+    if (total === 0) return '#666';
+    const ratio = Math.min(seen / total, 1);
+    // Červená -> Oranžová -> Zelená
+    const r = ratio < 0.5 ? 255 : Math.floor(255 - (ratio - 0.5) * 2 * 255);
+    const g = ratio > 0.5 ? 255 : Math.floor(ratio * 2 * 255);
+    return `rgb(${r}, ${g}, 0)`;
+}
+
+function renderRepertoire() {
+    const listDiv = document.getElementById('repertoire-list');
+    listDiv.innerHTML = '';
+    
+    const visibility = document.getElementById('filter-visibility').value;
+    const sortOrder = document.getElementById('filter-sort').value;
+
+    let filtered = repertoire.filter(item => {
+        if (visibility === 'main') return !item.hidden;
+        if (visibility === 'hidden') return item.hidden;
+        return true;
+    });
+
+    filtered.sort((a, b) => {
+        // Pinned vždy nahoře
+        if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
+        // Pak podle score
+        const scoreA = a.total > 0 ? (a.seen.length / a.total) : 0;
+        const scoreB = b.total > 0 ? (b.seen.length / b.total) : 0;
+        return sortOrder === 'desc' ? scoreB - scoreA : scoreA - scoreB;
+    });
+
+    filtered.forEach(item => {
+        const color = calculateScoreColor(item.seen.length, item.total);
+        const div = document.createElement('div');
+        div.className = `repertoire-item ${item.pinned ? 'pinned' : ''} ${item.hidden ? 'hidden-item' : ''}`;
+        div.style.borderLeftColor = color;
+        
+        div.innerHTML = `
+            <div class="rep-info" onclick="analyzePerson(${item.id})">
+                <span class="rep-name">${item.name}</span>
+                <span class="rep-score" style="color:${color}">${item.seen.length} / ${item.total}</span>
+            </div>
+            <div class="rep-actions">
+                <button class="btn-icon" style="border:none;" onclick="toggleRepertoireAttr(${item.id}, 'pinned')" title="Pin">📌</button>
+                <button class="btn-icon" style="border:none;" onclick="toggleRepertoireAttr(${item.id}, 'hidden')" title="Hide">👁️‍🗨️</button>
+            </div>
+        `;
+        listDiv.appendChild(div);
+    });
+}
+
+// --- POMOCNÉ VIZUÁLNÍ FUNKCE (Mapa a Timeline) ---
+function clearVisuals() {
+    currentMarkers.forEach(m => m.remove());
+    currentMarkers = [];
+    timelineItems.clear();
+    try { timeline.removeCustomTime('movie-release'); } catch(e){}
+}
+
+function jumpToYear(dateString) {
+    if(!dateString) return;
+    timeline.setSelection([]);
+    timeline.setWindow(new Date(new Date(dateString).setFullYear(new Date(dateString).getFullYear() - 1)), 
+                       new Date(new Date(dateString).setFullYear(new Date(dateString).getFullYear() + 1)));
+    switchView('timeline');
+}
+
+function populateTimeline(works, groupName) {
+    works.forEach((m, idx) => {
+        if(m.release_date) {
+            timelineItems.add({ id: idx, content: m.title, start: m.release_date, className: 'film-node' });
+        }
+    });
+    timeline.fit();
+}
+
+async function geocodeAndZoom(locationString) {
+    try {
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationString)}.json?access_token=${mapboxgl.accessToken}`);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+            const center = data.features[0].center;
+            switchView('map');
+            map.flyTo({ center: center, zoom: 6, essential: true });
+        }
+    } catch(e) { console.error("Geocoding failed"); }
+}
+
+async function geocodeAndAddMarker(locationString, movieTitle) {
+    try {
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationString)}.json?access_token=${mapboxgl.accessToken}`);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+            const lng = data.features[0].center[0];
+            const lat = data.features[0].center[1];
+            
+            const el = document.createElement('div');
+            el.className = 'custom-marker';
+            const popup = new mapboxgl.Popup({ offset: 15 }).setHTML(`<div style="color:var(--neon-orange);font-weight:bold;">${locationString}</div><div style="font-size:11px;">🎬 ${movieTitle}</div>`);
+            const marker = new mapboxgl.Marker(el).setLngLat([lng, lat]).setPopup(popup).addTo(map);
+            currentMarkers.push(marker);
+        }
+    } catch(e) {}
+}
+
+// Spuštění
+window.onload = initApp;

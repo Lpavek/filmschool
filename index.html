@@ -3,230 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cinematic Atlas - Pro Edition</title>
+    <title>Cinematic Atlas - Node & Repertoire Edition</title>
     
+    <!-- Mapbox -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css" rel="stylesheet">
+    <!-- Vis-Timeline & Vis-Network -->
     <link href="https://unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
-
-    <style>
-        :root {
-            --bg-color: #030303;
-            --panel-bg: #0a0a0a;
-            --neon-blue: #5c5cff; /* Zesvětlená modrá pro lepší čitelnost */
-            --neon-orange: #FF6600;
-            --neon-yellow: #FFD700;
-            --text-main: #E0E0E0;
-            --border: #3333ff;
-        }
-
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        /* Neonový efekt pro text */
-        .neon-text {
-            color: var(--neon-blue);
-            text-shadow: 0 0 8px rgba(92, 92, 255, 0.6);
-            font-weight: bold;
-        }
-
-        header {
-            background-color: var(--bg-color);
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid var(--border);
-            box-shadow: 0 0 20px rgba(92, 92, 255, 0.15);
-            z-index: 10;
-        }
-
-        h2 {
-            margin: 0;
-            font-weight: 900;
-            letter-spacing: 4px;
-        }
-
-        .controls {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-
-        .view-toggles button {
-            background: transparent;
-            border: 1px solid var(--neon-blue);
-            color: var(--neon-blue);
-            padding: 8px 15px;
-            margin-right: 5px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .view-toggles button.active, .view-toggles button:hover {
-            background: var(--neon-blue);
-            color: var(--bg-color);
-            box-shadow: 0 0 10px rgba(92, 92, 255, 0.5);
-        }
-
-        .search-container {
-            display: flex;
-            gap: 10px;
-        }
-
-        input[type="text"] {
-            padding: 8px 15px;
-            background: var(--bg-color);
-            border: 1px solid var(--neon-blue);
-            color: var(--text-main);
-            width: 250px;
-            text-transform: uppercase;
-            outline: none;
-        }
-
-        input[type="text"]:focus {
-            box-shadow: 0 0 10px rgba(92, 92, 255, 0.5);
-        }
-
-        button.action-btn {
-            padding: 8px 15px;
-            background-color: var(--bg-color);
-            color: var(--neon-orange);
-            border: 1px solid var(--neon-orange);
-            cursor: pointer;
-            font-weight: bold;
-            text-transform: uppercase;
-            transition: all 0.3s ease;
-        }
-
-        button.action-btn:hover {
-            background-color: var(--neon-orange);
-            color: var(--bg-color);
-            box-shadow: 0 0 15px rgba(255, 102, 0, 0.6);
-        }
-
-        #main-content {
-            display: flex;
-            flex: 1;
-            height: calc(100vh - 70px);
-            overflow: hidden;
-        }
-
-        #visual-panel {
-            flex: 1.2;
-            position: relative;
-            border-right: 2px solid var(--border);
-            background: var(--bg-color);
-        }
-
-        #map, #timeline-view {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        #timeline-view {
-            display: none; /* Skryto ve výchozím stavu */
-            padding: 20px;
-            box-sizing: border-box;
-            overflow-y: auto;
-        }
-
-        #data-panel {
-            width: 40%;
-            display: flex;
-            flex-direction: column;
-            background-color: var(--panel-bg);
-            overflow-y: auto;
-        }
-
-        .section {
-            padding: 20px;
-            border-bottom: 1px solid #222;
-        }
-
-        h3 {
-            color: var(--neon-orange);
-            margin-top: 0;
-            letter-spacing: 2px;
-            border-bottom: 1px solid var(--neon-orange);
-            padding-bottom: 5px;
-        }
-
-        /* Bio sekce */
-        #director-profile {
-            display: none;
-            gap: 15px;
-            margin-top: 15px;
-        }
-        #director-photo {
-            width: 100px;
-            height: 150px;
-            object-fit: cover;
-            border: 1px solid var(--neon-blue);
-        }
-        .bio-text {
-            font-size: 11px;
-            color: #aaa;
-            text-transform: none;
-            line-height: 1.4;
-            max-height: 120px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-
-        /* Seznamy */
-        .list-item {
-            background: #000;
-            border: 1px solid #222;
-            padding: 10px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .list-item:hover { border-color: var(--neon-blue); }
-
-        /* Map Markers */
-        .custom-marker {
-            background-color: var(--neon-orange);
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            border: 2px solid var(--bg-color);
-            cursor: pointer;
-            box-shadow: 0 0 15px var(--neon-yellow);
-        }
-        .mapboxgl-popup-content {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            border: 1px solid var(--neon-orange);
-            text-transform: uppercase;
-        }
-
-        /* Vis-Timeline */
-        .vis-timeline { border: none; font-family: inherit; }
-        .vis-item { background-color: var(--bg-color); border: 1px solid var(--neon-blue); color: var(--neon-blue); text-shadow: 0 0 5px rgba(92, 92, 255, 0.4); }
-        .vis-time-axis .vis-text { color: var(--neon-orange); }
-        
-        /* Scrollbar styling */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: var(--neon-blue); }
-    </style>
+    
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -234,356 +18,87 @@
         <h2 class="neon-text">Cinematic Atlas</h2>
         <div class="controls">
             <div class="view-toggles">
-                <button id="btn-map" class="active" onclick="switchView('map')">Map View</button>
-                <button id="btn-timeline" onclick="switchView('timeline')">Timeline View</button>
+                <button id="btn-map" class="active" onclick="switchView('map')">Map</button>
+                <button id="btn-timeline" onclick="switchView('timeline')">Timeline</button>
+                <button id="btn-network" onclick="switchView('network')" style="display: none;">Creators Node</button>
             </div>
             <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search director..." onkeypress="handleEnter(event)">
+                <input type="text" id="searchInput" placeholder="Search person or movie..." onkeypress="handleEnter(event)">
                 <button class="action-btn" onclick="searchAction()">Search</button>
             </div>
         </div>
     </header>
 
     <div id="main-content">
-        <!-- Levý panel: Vizualizace -->
+        <!-- Levý panel: Vizualizace (Mapa, Timeline, Node Network) -->
         <div id="visual-panel">
             <div id="map"></div>
             <div id="timeline-view">
                 <h3 class="neon-text">Global Timeline</h3>
                 <div id="timeline-container"></div>
             </div>
+            <div id="network-view">
+                <h3 class="neon-text">Creator Node Map</h3>
+                <div id="network-container"></div>
+            </div>
         </div>
 
         <!-- Pravý panel: Data a Repertoár -->
         <div id="data-panel">
-            
+            <!-- Vyhledávání / Analýza -->
             <div class="section" id="active-analysis-section">
                 <h3>Active Analysis</h3>
                 <div id="results-content">
-                    <p style="color: #666;">Enter a director's name to begin analysis.</p>
+                    <p style="color: #666;">Enter a creator or movie to begin.</p>
                 </div>
 
-                <!-- Detaily režiséra -->
-                <div id="director-profile">
-                    <img id="director-photo" src="" alt="Director">
-                    <div>
-                        <h4 id="director-name" class="neon-text" style="margin:0 0 5px 0;"></h4>
-                        <div style="font-size: 10px; color: var(--neon-orange); margin-bottom: 5px;" id="director-dates"></div>
-                        <div class="bio-text" id="director-bio"></div>
-                        <button class="action-btn" style="margin-top: 10px; padding: 5px 10px; font-size: 10px;" onclick="saveToRepertoire()">+ Add to Repertoire</button>
+                <!-- Detaily osoby / filmu -->
+                <div id="entity-profile">
+                    <div class="profile-header">
+                        <img id="entity-photo" src="" alt="Profile">
+                        <div class="profile-info">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <h4 id="entity-name" class="neon-text"></h4>
+                                <div id="entity-actions"></div>
+                            </div>
+                            <div class="bio-text" id="entity-details"></div>
+                            <div class="bio-text" id="entity-bio" style="margin-top: 10px;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="section">
-                <h3>Filmography</h3>
-                <div id="filmography-list" style="font-size: 12px; color: #aaa;">No data loaded.</div>
+            <!-- Filmografie / Obsah díla -->
+            <div class="section" id="filmography-section" style="display:none;">
+                <h3 id="filmography-title">Filmography</h3>
+                <div id="filmography-list" class="list-container"></div>
             </div>
 
+            <!-- Repertoár -->
             <div class="section">
-                <h3>My Repertoire</h3>
-                <div id="repertoire-list"></div>
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <h3>My Repertoire</h3>
+                    <div class="repertoire-filters">
+                        <select id="filter-visibility" onchange="renderRepertoire()">
+                            <option value="main">Main (Active)</option>
+                            <option value="hidden">Hidden</option>
+                            <option value="all">All</option>
+                        </select>
+                        <select id="filter-sort" onchange="renderRepertoire()">
+                            <option value="desc">Score (High-Low)</option>
+                            <option value="asc">Score (Low-High)</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="repertoire-list" class="repertoire-container"></div>
             </div>
-
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
-
-    <script>
-        const TMDB_API_KEY = '8818385dc34c1143c1b2589f2d36f790'; /* FIRST */
-        mapboxgl.accessToken = 'pk.eyJ1IjoibHVxcWV5IiwiYSI6ImNtdmF4MXg3OTA4c3oyeXI0aTgzNnM5MW4ifQ.ZoG892NR3JW26wh-ZGdPRg'; /* SECOND */
-
-        let map, timeline;
-        let timelineItems = new vis.DataSet([]);
-        let currentMarkers = [];
-        let currentDirector = null;
-        let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoire')) || [];
-
-        // --- INICIALIZACE ---
-        function initApp() {
-            // Mapa 3D Globe
-            map = new mapboxgl.Map({
-                container: 'map',
-                style: 'mapbox://styles/mapbox/dark-v11',
-                center: [10, 45],
-                zoom: 1.8,
-                projection: 'globe'
-            });
-
-            // Rotace planety
-            let userInteracted = false;
-            function rotateGlobe() {
-                if (userInteracted) return;
-                if (map.getZoom() < 3) {
-                    const center = map.getCenter();
-                    center.lng -= 360 / (180 * 60);
-                    map.easeTo({ center, duration: 0, easing: (n) => n });
-                }
-            }
-            ['mousedown', 'touchstart', 'dragstart', 'zoomstart'].forEach(e => {
-                map.on(e, () => userInteracted = true);
-            });
-            map.on('moveend', rotateGlobe);
-            rotateGlobe();
-
-            // Timeline
-            timeline = new vis.Timeline(document.getElementById('timeline-container'), timelineItems, {
-                start: '1970-01-01', end: '2030-01-01', height: '100%',
-                zoomMin: 1000 * 60 * 60 * 24 * 365, margin: { item: 10 }
-            });
-
-            renderRepertoire();
-        }
-        initApp();
-
-        // --- PŘEPÍNÁNÍ POHLEDŮ ---
-        function switchView(view) {
-            document.getElementById('btn-map').classList.remove('active');
-            document.getElementById('btn-timeline').classList.remove('active');
-            document.getElementById('map').style.display = 'none';
-            document.getElementById('timeline-view').style.display = 'none';
-
-            if (view === 'map') {
-                document.getElementById('btn-map').classList.add('active');
-                document.getElementById('map').style.display = 'block';
-                map.resize();
-            } else {
-                document.getElementById('btn-timeline').classList.add('active');
-                document.getElementById('timeline-view').style.display = 'block';
-                timeline.redraw();
-            }
-        }
-
-        // --- VYHLEDÁVÁNÍ ---
-        function handleEnter(e) { if (e.key === 'Enter') searchAction(); }
-
-        async function searchAction() {
-            const query = document.getElementById('searchInput').value.trim();
-            if (!query) return;
-
-            const resDiv = document.getElementById('results-content');
-            resDiv.innerHTML = `<p class="neon-text">Querying TMDB for: ${query}...</p>`;
-            document.getElementById('director-profile').style.display = 'none';
-
-            if (TMDB_API_KEY === 'SEM_VLOZ_SVUJ_TMDB_KLIC') {
-                resDiv.innerHTML = `<p style="color:var(--neon-orange)">API KEY MISSING (FIRST).</p>`;
-                return;
-            }
-
-            try {
-                const response = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
-                const data = await response.json();
-
-                if (data.results && data.results.length > 0) {
-                    resDiv.innerHTML = '';
-                    data.results.slice(0, 3).forEach(person => {
-                        const div = document.createElement('div');
-                        div.className = 'list-item';
-                        div.innerHTML = `
-                            <div><strong class="neon-text">${person.name}</strong></div>
-                            <button class="action-btn" onclick="analyzeDirector(${person.id})">Analyze</button>
-                        `;
-                        resDiv.appendChild(div);
-                    });
-                } else {
-                    resDiv.innerHTML = `<p>No matches found.</p>`;
-                }
-            } catch (err) {
-                resDiv.innerHTML = `<p style="color:var(--neon-orange)">Connection error.</p>`;
-            }
-        }
-
-        // --- HLAVNÍ ANALÝZA REŽISÉRA ---
-        async function analyzeDirector(personId) {
-            document.getElementById('results-content').innerHTML = `<p class="neon-text">Extracting DNA...</p>`;
-            clearVisuals();
-
-            try {
-                // 1. Získání detailů (Bio, Fotka)
-                const detailRes = await fetch(`https://api.themoviedb.org/3/person/${personId}?api_key=${TMDB_API_KEY}`);
-                const detailData = await detailRes.json();
-                
-                // 2. Získání kompletní filmografie
-                const creditRes = await fetch(`https://api.themoviedb.org/3/person/${personId}/movie_credits?api_key=${TMDB_API_KEY}`);
-                const creditData = await creditRes.json();
-
-                // Filtrace pouze na režírované filmy, seřazení chronologicky
-                let directedMovies = creditData.crew.filter(c => c.job === 'Director' && c.release_date);
-                directedMovies.sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
-
-                // Uložení aktuálního kontextu
-                currentDirector = {
-                    id: detailData.id,
-                    name: detailData.name,
-                    profile_path: detailData.profile_path,
-                    movies: directedMovies
-                };
-
-                // Vykreslení UI
-                showDirectorProfile(detailData);
-                renderFilmographyList(directedMovies);
-                populateTimeline(directedMovies, detailData.name);
-                await mapProductionLocations(directedMovies);
-
-                document.getElementById('results-content').innerHTML = ``;
-            } catch (err) {
-                document.getElementById('results-content').innerHTML = `<p style="color:var(--neon-orange)">Analysis failed.</p>`;
-            }
-        }
-
-        function showDirectorProfile(data) {
-            const profileDiv = document.getElementById('director-profile');
-            profileDiv.style.display = 'flex';
-            
-            document.getElementById('director-name').innerText = data.name;
-            document.getElementById('director-dates').innerText = `BORN: ${data.birthday || 'UNKNOWN'}`;
-            document.getElementById('director-bio').innerText = data.biography || 'No biography available.';
-            
-            const imgEl = document.getElementById('director-photo');
-            if (data.profile_path) {
-                imgEl.src = `https://image.tmdb.org/t/p/w200${data.profile_path}`;
-                imgEl.style.display = 'block';
-            } else {
-                imgEl.style.display = 'none';
-            }
-        }
-
-        function renderFilmographyList(movies) {
-            const listDiv = document.getElementById('filmography-list');
-            listDiv.innerHTML = '';
-            movies.forEach(m => {
-                const year = m.release_date ? m.release_date.split('-')[0] : 'N/A';
-                listDiv.innerHTML += `<div style="margin-bottom: 5px;"><strong class="neon-text">${year}</strong> - ${m.title}</div>`;
-            });
-        }
-
-        function populateTimeline(movies, directorName) {
-            movies.forEach((m, idx) => {
-                timelineItems.add({
-                    id: `${directorName}-${idx}`,
-                    content: m.title,
-                    start: m.release_date,
-                    group: directorName // V budoucnu umožní vrstvit více režisérů
-                });
-            });
-            timeline.fit();
-        }
-
-        // --- CHYTRÉ GEOKÓDOVÁNÍ (Zabránění překrývání a API limitům) ---
-        async function mapProductionLocations(movies) {
-            if (mapboxgl.accessToken === 'SEM_VLOZ_SVUJ_MAPBOX_KLIC') return;
-
-            document.getElementById('results-content').innerHTML = `<p class="neon-text">Mapping geographical data...</p>`;
-            
-            // Sdružení filmů podle zemí (ušetří to API volání a zabrání překrývání bodů)
-            const countryMap = {};
-
-            for (const movie of movies) {
-                try {
-                    const res = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_API_KEY}`);
-                    const details = await res.json();
-
-                    if (details.production_countries) {
-                        details.production_countries.forEach(country => {
-                            if (!countryMap[country.name]) {
-                                countryMap[country.name] = [];
-                            }
-                            countryMap[country.name].push(`${movie.title} (${movie.release_date.split('-')[0]})`);
-                        });
-                    }
-                } catch (e) { /* Ignorovat chyby u jednotlivých filmů */ }
-            }
-
-            // Vykreslení unikátních zemí
-            for (const [countryName, movieList] of Object.entries(countryMap)) {
-                try {
-                    const geoUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(countryName)}.json?access_token=${mapboxgl.accessToken}`;
-                    const geoRes = await fetch(geoUrl);
-                    const geoData = await geoRes.json();
-
-                    if (geoData.features && geoData.features.length > 0) {
-                        const lng = geoData.features[0].center[0];
-                        const lat = geoData.features[0].center[1];
-
-                        // Vytvoření HTML pro popup se všemi filmy v dané lokaci
-                        let moviesHTML = movieList.map(m => `<div>- ${m}</div>`).join('');
-                        
-                        addCustomMarker(lng, lat, countryName, moviesHTML);
-                    }
-                } catch (e) { console.error("Geocoding failed:", countryName); }
-            }
-        }
-
-        function addCustomMarker(lng, lat, locationName, moviesHTML) {
-            const el = document.createElement('div');
-            el.className = 'custom-marker';
-
-            const popupHTML = `
-                <div style="font-size: 14px; font-weight: bold; color: var(--neon-orange); margin-bottom: 5px; border-bottom: 1px solid #333;">${locationName}</div>
-                <div style="font-size: 11px; max-height: 150px; overflow-y: auto;">
-                    ${moviesHTML}
-                </div>
-            `;
-
-            const popup = new mapboxgl.Popup({ offset: 15 }).setHTML(popupHTML);
-            const marker = new mapboxgl.Marker(el).setLngLat([lng, lat]).setPopup(popup).addTo(map);
-            currentMarkers.push(marker);
-        }
-
-        function clearVisuals() {
-            currentMarkers.forEach(marker => marker.remove());
-            currentMarkers = [];
-            timelineItems.clear();
-        }
-
-        // --- REPERTOÁR ---
-        function saveToRepertoire() {
-            if (!currentDirector) return;
-            
-            // Kontrola duplicit
-            if (!repertoire.some(d => d.id === currentDirector.id)) {
-                repertoire.push({
-                    id: currentDirector.id,
-                    name: currentDirector.name
-                });
-                localStorage.setItem('cinematicRepertoire', JSON.stringify(repertoire));
-                renderRepertoire();
-                alert(`${currentDirector.name} saved to Repertoire!`);
-            } else {
-                alert(`${currentDirector.name} is already in your Repertoire.`);
-            }
-        }
-
-        function renderRepertoire() {
-            const listDiv = document.getElementById('repertoire-list');
-            listDiv.innerHTML = '';
-            
-            if (repertoire.length === 0) {
-                listDiv.innerHTML = '<p style="font-size:11px; color:#666;">Repertoire is empty.</p>';
-                return;
-            }
-
-            repertoire.forEach((dir, index) => {
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `
-                    <span class="neon-text">${dir.name}</span>
-                    <div>
-                        <button class="action-btn" style="padding: 3px 8px; font-size: 10px;" onclick="analyzeDirector(${dir.id})">Load</button>
-                        <button style="background:transparent; color:#888; border:none; cursor:pointer;" onclick="removeFromRepertoire(${index})">X</button>
-                    </div>
-                `;
-                listDiv.appendChild(div);
-            });
-        }
-
-        function removeFromRepertoire(index) {
-            repertoire.splice(index, 1);
-            localStorage.setItem('cinematicRepertoire', JSON.stringify(repertoire));
-            renderRepertoire();
-        }
-    </script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/standalone/umd/vis-network.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
