@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Film School Atlas</title>
+    <title>FILMSCHOOL ATLAS</title>
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>">
@@ -18,7 +18,7 @@
 <body>
 
     <header>
-        <h2 class="neon-text">FILM SCHOOL ATLAS</h2>
+        <h2 class="neon-text">FILMSCHOOL ATLAS</h2>
         <div class="controls">
             <div class="view-toggles">
                 <button id="btn-map" class="active" onclick="switchView('map')">MAP</button>
@@ -41,7 +41,7 @@
                 <div id="timeline-container"></div>
             </div>
 
-            <!-- Atmosphere Glow Intensity Slider (Centered horizontally at the bottom) -->
+            <!-- Atmosphere Glow Intensity Slider -->
             <div class="glow-control">
                 <span class="glow-label">GLOW</span>
                 <input type="range" id="glowSlider" min="0" max="100" value="50" oninput="updateGlobeGlow(this.value)">
@@ -107,9 +107,9 @@
                 <div class="section" id="filmography-section" style="display:none;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <h3 id="filmography-title" style="margin-bottom:0;">FILMOGRAPHY</h3>
-                        <div style="display:flex; gap:6px;">
-                            <button class="sort-toggle-btn" id="upcoming-toggle-btn" onclick="toggleUpcoming()" title="Toggle Planned / Future Movies">
-                                🔮 <span>SHOW FUTURE</span>
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <button class="discrete-future-btn" id="upcoming-toggle-btn" onclick="toggleUpcoming()" title="Toggle Upcoming / Future Projects">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg>
                             </button>
                             <button class="sort-toggle-btn" id="filmography-sort-btn" onclick="toggleFilmographySort()" title="Toggle Order">
                                 <span>NEWEST FIRST</span> ↕
@@ -124,27 +124,31 @@
             <!-- Horizontal Resizer Bar -->
             <div id="resizer-h"></div>
 
-            <!-- Locked Bottom Repertoire Section -->
+            <!-- Locked Bottom Repertoire Section with Wishlist Split Screen Drawer -->
             <div class="section" id="repertoire-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <h3 style="margin-bottom:0;">MY REPERTOIRE</h3>
-                    <div class="repertoire-filters">
-                        <select id="filter-tab-sort" onchange="changeTabSortMode(this.value)" title="Sort Repertoire Categories">
-                            <option value="recent">TABS: RECENT ADDED</option>
-                            <option value="count">TABS: COUNT</option>
-                            <option value="default">TABS: DEFAULT</option>
-                        </select>
-                        <select id="filter-visibility" onchange="renderRepertoire()">
-                            <option value="main">ACTIVE</option>
-                            <option value="wishlist">WISHLIST</option>
-                            <option value="hidden">HIDDEN</option>
-                            <option value="all">ALL</option>
-                        </select>
-                        <select id="filter-sort" onchange="renderRepertoire()">
-                            <option value="desc">SCORE (HIGH-LOW)</option>
-                            <option value="asc">SCORE (LOW-HIGH)</option>
-                            <option value="alpha">A-Z</option>
-                        </select>
+                    <div class="repertoire-filters-wrapper">
+                        <div class="repertoire-filters">
+                            <select id="filter-tab-sort" onchange="changeTabSortMode(this.value)" title="Sort Repertoire Categories">
+                                <option value="recent">TABS: RECENT ADDED</option>
+                                <option value="count">TABS: COUNT</option>
+                                <option value="default">TABS: DEFAULT</option>
+                            </select>
+                            <select id="filter-visibility" onchange="renderRepertoire()">
+                                <option value="main">ACTIVE</option>
+                                <option value="hidden">HIDDEN</option>
+                                <option value="all">ALL</option>
+                            </select>
+                            <select id="filter-sort" onchange="renderRepertoire()">
+                                <option value="desc">SCORE (HIGH-LOW)</option>
+                                <option value="asc">SCORE (LOW-HIGH)</option>
+                                <option value="alpha">A-Z</option>
+                            </select>
+                        </div>
+                        <button id="btn-toggle-wishlist" class="btn-icon wishlist-toggle-btn" onclick="toggleWishlistDrawer()" title="Toggle Wishlist Split View">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                        </button>
                     </div>
                 </div>
 
@@ -153,7 +157,19 @@
                     <div class="rep-tabs" id="rep-tabs"></div>
                 </div>
 
-                <div id="repertoire-list" class="repertoire-container"></div>
+                <!-- Repertoire Content Split View Container -->
+                <div class="repertoire-split-container">
+                    <div class="rep-main-col">
+                        <div id="repertoire-list" class="repertoire-container"></div>
+                    </div>
+                    <div class="rep-wishlist-col" id="rep-wishlist-col">
+                        <div class="wishlist-header">
+                            <span>WISHLIST / SAVED</span>
+                            <span id="wishlist-count-badge" class="tab-count">(0)</span>
+                        </div>
+                        <div id="wishlist-list" class="repertoire-container"></div>
+                    </div>
+                </div>
             </div>
 
         </div>
