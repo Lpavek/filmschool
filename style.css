@@ -243,12 +243,32 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 .film-title:hover { color: var(--neon-blue); }
 
 .film-actions { display: flex; gap: 6px; align-items: center; }
-.btn-icon { background: #000; border: 1px solid #334155; color: #64748b; width: 26px; height: 26px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.btn-icon { background: #000; border: 1px solid #334155; color: #64748b; width: 26px; height: 26px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; position: relative; }
 .btn-icon:hover { border-color: #94a3b8; color: #fff; }
 .btn-icon.active-seen { background: rgba(16, 185, 129, 0.15); border-color: var(--neon-green); color: var(--neon-green); }
 .btn-icon.active-wish { background: rgba(255, 215, 0, 0.18); border-color: var(--neon-yellow); color: var(--neon-yellow); box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
 .btn-icon.active-pinned { color: var(--neon-yellow); border-color: var(--neon-yellow); background: rgba(255, 215, 0, 0.12); }
 .btn-icon.imdb-link { border-color: transparent; color: #f5c518; text-decoration: none; }
+
+/* Dynamic Wishlist Badge Bubble */
+.wishlist-toggle-btn { position: relative; }
+.wishlist-badge-bubble {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--neon-yellow);
+    color: #000000;
+    font-size: 8px;
+    font-weight: 900;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.9);
+    line-height: 1;
+}
 
 /* Repertoire Header & Wishlist Drawer Trigger */
 .repertoire-filters-wrapper { display: flex; gap: 8px; align-items: center; }
@@ -327,7 +347,7 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 /* Custom Markers */
 .custom-marker { background-color: var(--neon-orange); width: 10px; height: 10px; border-radius: 50%; border: 2px solid #000; cursor: pointer; box-shadow: 0 0 12px var(--neon-orange); }
 
-/* --- ENHANCED VIS TIMELINE STYLING --- */
+/* --- ENHANCED VIS TIMELINE STYLING & STEM FIX --- */
 .vis-timeline { border: none !important; background: transparent; }
 .vis-item {
     background-color: #0d0d16 !important;
@@ -352,14 +372,38 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
     color: #fff !important;
 }
 
-/* Active Highlighted Film Glow Node */
-.vis-item.active-timeline-node {
+/* Active Highlighted Film Box */
+.vis-item.vis-box.active-timeline-node,
+.vis-item.vis-range.active-timeline-node,
+.vis-item.vis-point.active-timeline-node {
     border: 2px solid var(--neon-orange) !important;
-    background: rgba(255, 102, 0, 0.35) !important;
+    background: rgba(255, 102, 0, 0.3) !important;
     color: #ffffff !important;
     box-shadow: 0 0 14px rgba(255, 102, 0, 0.8) !important;
     font-weight: 700 !important;
     z-index: 100 !important;
+}
+
+/* Active Vertical Stem Line - Crisp 2px Line Fix */
+.vis-item.vis-line.active-timeline-node {
+    border-left: 2px solid var(--neon-orange) !important;
+    border-right: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    width: 0 !important;
+}
+
+/* Standard Vertical Stem Line */
+.vis-item.vis-line {
+    border-left: 1px solid rgba(92, 92, 255, 0.4) !important;
+    border-right: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    width: 0 !important;
 }
 
 /* Discrete Grey Upcoming Node for Timeline */
@@ -373,9 +417,19 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 .tl-year { color: var(--neon-orange); font-size: 10px; font-weight: 700; margin-left: 3px; }
 .vis-item.upcoming-node .tl-year { color: #64748b !important; }
 
-/* Subtle Stem & Dot Styling */
-.vis-item.vis-line { border-left: 1px solid rgba(92, 92, 255, 0.35) !important; }
-.vis-item.vis-dot { border-color: var(--neon-blue) !important; background-color: var(--neon-orange) !important; }
+/* Customized Dark Futuristic Tooltip */
+div.vis-tooltip {
+    background-color: #09090d !important;
+    color: #f8fafc !important;
+    border: 1px solid var(--neon-blue) !important;
+    border-radius: 4px !important;
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+    font-family: inherit !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.85) !important;
+    letter-spacing: 0.5px !important;
+    z-index: 1000 !important;
+}
 
 .vis-time-axis .vis-text { color: #64748b !important; font-size: 10px; font-weight: 700; }
 .vis-panel.vis-background, .vis-panel.vis-bottom, .vis-panel.vis-left, .vis-panel.vis-right, .vis-panel.vis-top { border-color: #1e1e2e !important; }
