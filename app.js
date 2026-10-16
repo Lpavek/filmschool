@@ -11,6 +11,19 @@ let mapIdleTimer;
 let activeRepertoireTab = 'directors';
 let filmographySortOrder = 'desc';
 
+// Dynamic Tab Sorting State
+let tabSortMode = localStorage.getItem('cinematicTabSortMode') || 'recent'; // 'recent', 'count', 'default'
+let categoryMeta = JSON.parse(localStorage.getItem('cinematicCategoryMeta')) || {
+    directors: { lastUpdated: 8 },
+    writers: { lastUpdated: 7 },
+    cinematographers: { lastUpdated: 6 },
+    musicians: { lastUpdated: 5 },
+    editors: { lastUpdated: 4 },
+    actors: { lastUpdated: 3 },
+    movies: { lastUpdated: 2 },
+    series: { lastUpdated: 1 }
+};
+
 const REPERTOIRE_CATEGORIES = ['directors', 'writers', 'cinematographers', 'musicians', 'editors', 'actors', 'movies', 'series'];
 let lastTabWheelTime = 0;
 
@@ -24,7 +37,7 @@ const SVG_ICONS = {
 };
 
 // Repertoire storage
-let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v5')) || [];
+let repertoire = JSON.parse(localStorage.getItem('cinematicRepertoirePRO_v6')) || [];
 
 function initApp() {
     // 1. Initialize Mapbox Globe
@@ -37,7 +50,7 @@ function initApp() {
     });
 
     map.on('style.load', () => {
-        updateGlobeGlow(50); // Default glow setting
+        updateGlobeGlow(50);
     });
 
     // Idle rotation logic
@@ -63,12 +76,15 @@ function initApp() {
         }
     });
 
-    // 3. Initialize Both Resizers (Vertical & Horizontal)
-    initResizers();
+    // Set initial select dropdown value
+    const tabSortSelect = document.getElementById('filter-tab-sort');
+    if (tabSortSelect) tabSortSelect.value = tabSortMode;
 
-    // 4. Initialize Wheel Tab Switcher
+    // 3. Initialize Resizers & Tabs
+    initResizers();
     initTabsScroll();
 
+    renderTabs();
     renderRepertoire();
 }
 
@@ -97,7 +113,6 @@ function rotateGlobe() {
 
 // --- DRAGGABLE RESIZERS (VERTICAL & HORIZONTAL) ---
 function initResizers() {
-    // 1. Vertical Splitter (Left/Right Panel width)
     const resizerV = document.getElementById('resizer');
     const rightPanel = document.getElementById('data-panel');
     let isDraggingV = false;
@@ -108,7 +123,6 @@ function initResizers() {
         document.body.style.cursor = 'col-resize';
     });
 
-    // 2. Horizontal Splitter (Top Analyses / Bottom Repertoire height)
     const resizerH = document.getElementById('resizer-h');
     const repSection = document.getElementById('repertoire-section');
     let isDraggingH = false;
@@ -123,7 +137,6 @@ function initResizers() {
         if (isDraggingV) {
             const containerWidth = document.getElementById('main-content').offsetWidth;
             const newRightWidth = containerWidth - e.clientX;
-            // Expanded limit: allow dragging up to 90% of screen width
             if (newRightWidth > 150 && newRightWidth < containerWidth - 100) {
                 rightPanel.style.width = `${newRightWidth}px`;
                 if (map) map.resize();
@@ -153,7 +166,63 @@ function initResizers() {
     });
 }
 
-// --- REPERTOIRE TABS AUTOMATIC WHEEL SWITCHING ---
+// --- DYNAMIC REPERTOIRE TABS RENDER & SORTING ---
+function touchCategory(cat) {
+    if (!categoryMeta[cat]) categoryMeta[cat] = {};
+    categoryMeta[cat].lastUpdated = Date.now();
+    localStorage.setItem('cinematicCategoryMeta', JSON.stringify(categoryMeta));
+    renderTabs();
+}
+
+function changeTabSortMode(mode) {
+    tabSortMode = mode;
+    localStorage.setItem('cinematicTabSortMode', mode);
+    renderTabs();
+}
+
+function renderTabs() {
+    const tabsContainer = document.getElementById('rep-tabs');
+    if (!tabsContainer) return;
+
+    let categories = [...REPERTOIRE_CATEGORIES];
+
+    if (tabSortMode === 'recent') {
+        categories.sort((a, b) => {
+            const timeA = categoryMeta[a]?.lastUpdated || 0;
+            const timeB = categoryMeta[b]?.lastUpdated || 0;
+            return timeB - timeA;
+        });
+    } else if (tabSortMode === 'count') {
+        categories.sort((a, b) => {
+            const countA = repertoire.filter(r => r.category === a).length;
+            const countB = repertoire.filter(r => r.category === b).length;
+            return countB - countA;
+        });
+    }
+
+    const labelMap = {
+        directors: 'DIRECTING',
+        writers: 'SCREENPLAY',
+        cinematographers: 'CAMERA',
+        musicians: 'MUSIC',
+        editors: 'EDITING',
+        actors: 'ACTING',
+        movies: 'MOVIES',
+        series: 'SERIES'
+    };
+
+    tabsContainer.innerHTML = '';
+    categories.forEach(cat => {
+        const count = repertoire.filter(r => r.category === cat).length;
+        const btn = document.createElement('button');
+        btn.className = `rep-tab-btn ${cat === activeRepertoireTab ? 'active' : ''}`;
+        btn.dataset.cat = cat;
+        btn.innerHTML = `<span>${labelMap[cat] || cat.toUpperCase()}</span> ${count > 0 ? `<span class="tab-count">(${count})</span>` : ''}`;
+        btn.onclick = () => setRepertoireTab(cat);
+        tabsContainer.appendChild(btn);
+    });
+}
+
 function initTabsScroll() {
     const tabsContainer = document.getElementById('rep-tabs');
     if (!tabsContainer) return;
@@ -161,14 +230,18 @@ function initTabsScroll() {
     tabsContainer.addEventListener('wheel', (e) => {
         e.preventDefault();
         const now = Date.now();
-        if (now - lastTabWheelTime < 150) return; // 150ms debounce
+        if (now - lastTabWheelTime < 150) return;
 
-        let idx = REPERTOIRE_CATEGORIES.indexOf(activeRepertoireTab);
-        if (e.deltaY > 0 && idx < REPERTOIRE_CATEGORIES.length - 1) {
-            setRepertoireTab(REPERTOIRE_CATEGORIES[idx + 1]);
+        // Get active rendered order of tabs
+        const activeButtons = Array.from(tabsContainer.querySelectorAll('.rep-tab-btn'));
+        const activeCats = activeButtons.map(b => b.dataset.cat);
+        
+        let idx = activeCats.indexOf(activeRepertoireTab);
+        if (e.deltaY > 0 && idx < activeCats.length - 1) {
+            setRepertoireTab(activeCats[idx + 1]);
             lastTabWheelTime = now;
         } else if (e.deltaY < 0 && idx > 0) {
-            setRepertoireTab(REPERTOIRE_CATEGORIES[idx - 1]);
+            setRepertoireTab(activeCats[idx - 1]);
             lastTabWheelTime = now;
         }
     });
@@ -556,7 +629,7 @@ function renderCreatorsBreakdown(credits) {
     });
 }
 
-// --- LEFT SUB-INSPECTOR PANEL (FULL CREATOR ANALYSIS) ---
+// --- LEFT SUB-INSPECTOR PANEL ---
 async function openSubInspectorPerson(personId, highlightMovieId) {
     const subPanel = document.getElementById('sub-inspector-panel');
     const container = document.getElementById('sub-panel-content');
@@ -700,9 +773,7 @@ function renderFilmographyList(works) {
 // --- REPERTOIRE MANAGEMENT ---
 function setRepertoireTab(cat) {
     activeRepertoireTab = cat;
-    document.querySelectorAll('.rep-tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.cat === cat);
-    });
+    touchCategory(cat);
     renderRepertoire();
 }
 
@@ -727,6 +798,8 @@ function toggleFilmStatus(filmId, type) {
     if (!currentEntity || currentEntity.type !== 'person') return;
     
     const cat = getCategoryFromDepartment(currentEntity.job);
+    touchCategory(cat);
+    
     let repItem = repertoire.find(r => r.id === currentEntity.id && r.category === cat);
     
     if (!repItem) {
@@ -754,6 +827,7 @@ function forceAddToRepertoire() {
 
     if (currentEntity.type === 'person') {
         const cat = getCategoryFromDepartment(currentEntity.job);
+        touchCategory(cat);
         if (!repertoire.find(r => r.id === currentEntity.id && r.category === cat)) {
             repertoire.push({ id: currentEntity.id, name: currentEntity.name, category: cat, total: currentEntity.works.length, seen: [], wish: [], pinned: false, hidden: false });
             saveRepertoire();
@@ -761,14 +835,18 @@ function forceAddToRepertoire() {
         }
     } else {
         const cat = currentEntity.type === 'tv' ? 'series' : 'movies';
+        touchCategory(cat);
         if (!repertoire.find(r => r.id === currentEntity.id && r.category === cat)) {
             repertoire.push({ id: currentEntity.id, name: currentEntity.title, category: cat, total: 1, seen: [currentEntity.id], wish: [], pinned: false, hidden: false });
         }
 
         if (currentEntity.credits && currentEntity.credits.crew) {
             const dir = currentEntity.credits.crew.find(c => c.job === 'Director');
-            if (dir && !repertoire.find(r => r.id === dir.id && r.category === 'directors')) {
-                repertoire.push({ id: dir.id, name: dir.name, category: 'directors', total: 10, seen: [currentEntity.id], wish: [], pinned: false, hidden: false });
+            if (dir) {
+                touchCategory('directors');
+                if (!repertoire.find(r => r.id === dir.id && r.category === 'directors')) {
+                    repertoire.push({ id: dir.id, name: dir.name, category: 'directors', total: 10, seen: [currentEntity.id], wish: [], pinned: false, hidden: false });
+                }
             }
         }
 
@@ -778,6 +856,7 @@ function forceAddToRepertoire() {
 }
 
 function toggleRepertoireAttr(id, cat, attr) {
+    touchCategory(cat);
     const item = repertoire.find(r => r.id === id && r.category === cat);
     if (item) {
         item[attr] = !item[attr];
@@ -786,7 +865,7 @@ function toggleRepertoireAttr(id, cat, attr) {
 }
 
 function saveRepertoire() {
-    localStorage.setItem('cinematicRepertoirePRO_v5', JSON.stringify(repertoire));
+    localStorage.setItem('cinematicRepertoirePRO_v6', JSON.stringify(repertoire));
     renderRepertoire();
 }
 
