@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="cs">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cinematic Atlas - Node & Repertoire Edition</title>
+    <title>Cinematic Atlas - Professional Edition</title>
     
-    <!-- Favicon (řeší 404 chybu) -->
+    <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>">
 
-    <!-- Mapbox -->
+    <!-- Mapbox GL JS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css" rel="stylesheet">
-    <!-- Vis-Timeline & Vis-Network -->
+    <!-- Vis-Timeline -->
     <link href="https://unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
     
     <link rel="stylesheet" href="style.css">
@@ -21,42 +21,51 @@
         <h2 class="neon-text">Cinematic Atlas</h2>
         <div class="controls">
             <div class="view-toggles">
-                <button id="btn-map" class="active" onclick="switchView('map')">Map</button>
+                <button id="btn-map" class="active" onclick="switchView('map')">Mapa</button>
                 <button id="btn-timeline" onclick="switchView('timeline')">Timeline</button>
-                <button id="btn-network" onclick="switchView('network')" style="display: none;">Creators Node</button>
             </div>
             <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search person or movie..." onkeypress="handleEnter(event)">
-                <button class="action-btn" onclick="searchAction()">Search</button>
+                <input type="text" id="searchInput" placeholder="Hledat tvůrce nebo film..." onkeypress="handleEnter(event)">
+                <button class="action-btn" onclick="searchAction()">Hledat</button>
             </div>
         </div>
     </header>
 
     <div id="main-content">
-        <!-- Levý panel: Vizualizace -->
+        <!-- Levý panel: Vizualizace a Podvyhledávání -->
         <div id="visual-panel">
             <div id="map"></div>
             <div id="timeline-view">
-                <h3 class="neon-text">Global Timeline</h3>
+                <h3 class="neon-text">Globální Timeline</h3>
                 <div id="timeline-container"></div>
             </div>
-            <div id="network-view">
-                <h3 class="neon-text">Creator Node Map</h3>
-                <div id="network-container"></div>
+            
+            <!-- Levý panel pro aktivní podvyhledávání (detail tvůrce z filmu nebo detail filmu z tvůrce) -->
+            <div id="sub-inspector-panel" class="sub-panel" style="display: none;">
+                <div class="sub-panel-header">
+                    <span class="sub-panel-title neon-text" id="sub-panel-title">Aktivní Detail</span>
+                    <button class="close-btn" onclick="closeSubInspector()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div id="sub-panel-content"></div>
             </div>
         </div>
 
-        <!-- Pravý panel: Data a Repertoár -->
+        <!-- Posuvná delička panelů -->
+        <div id="resizer"></div>
+
+        <!-- Pravý panel: Data, Analýza a Repertoár -->
         <div id="data-panel">
-            <!-- Vyhledávání / Analýza -->
+            <!-- Hlavní sekce Biografie / Detailu -->
             <div class="section" id="active-analysis-section">
-                <h3>Active Analysis</h3>
+                <h3 id="analysis-section-title">Aktivní Analýza</h3>
                 <div id="results-content">
-                    <p style="color: #666;">Enter a creator or movie to begin.</p>
+                    <p style="color: #666;">Zadejte tvůrce nebo film do vyhledávání.</p>
                 </div>
 
-                <!-- Detaily osoby / filmu -->
-                <div id="entity-profile">
+                <!-- Detaily osoby nebo filmu -->
+                <div id="entity-profile" style="display: none;">
                     <div class="profile-header">
                         <img id="entity-photo" src="" alt="Profile">
                         <div class="profile-info">
@@ -71,37 +80,56 @@
                 </div>
             </div>
 
-            <!-- Filmografie / Obsah díla -->
+            <!-- Sekce Tvůrci (při rozkliku filmu) -->
+            <div class="section" id="creators-section" style="display:none;">
+                <h3>Tvůrci & Obsazení</h3>
+                <div id="creators-breakdown" class="creators-grid"></div>
+            </div>
+
+            <!-- Filmografie (při rozkliku osoby) -->
             <div class="section" id="filmography-section" style="display:none;">
-                <h3 id="filmography-title">Filmography</h3>
+                <h3 id="filmography-title">Filmografie</h3>
                 <div id="filmography-list" class="list-container"></div>
             </div>
 
-            <!-- Repertoár -->
-            <div class="section">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <h3>My Repertoire</h3>
+            <!-- Sekce Repertoár -->
+            <div class="section" id="repertoire-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3>Můj Repertoár</h3>
                     <div class="repertoire-filters">
                         <select id="filter-visibility" onchange="renderRepertoire()">
-                            <option value="main">Main (Active)</option>
-                            <option value="hidden">Hidden</option>
-                            <option value="all">All</option>
+                            <option value="main">Aktivní</option>
+                            <option value="hidden">Skryté</option>
+                            <option value="all">Vše</option>
                         </select>
                         <select id="filter-sort" onchange="renderRepertoire()">
-                            <option value="desc">Score (High-Low)</option>
-                            <option value="asc">Score (Low-High)</option>
+                            <option value="desc">Skóre (Nejvyšší)</option>
+                            <option value="asc">Skóre (Nejnižší)</option>
+                            <option value="alpha">Abecedně</option>
                         </select>
                     </div>
                 </div>
+
+                <!-- Záložky kategórií Repertoáru -->
+                <div class="rep-tabs" id="rep-tabs">
+                    <button class="rep-tab-btn active" data-cat="directors" onclick="setRepertoireTab('directors')">Režie</button>
+                    <button class="rep-tab-btn" data-cat="writers" onclick="setRepertoireTab('writers')">Scénář</button>
+                    <button class="rep-tab-btn" data-cat="cinematographers" onclick="setRepertoireTab('cinematographers')">Kamera</button>
+                    <button class="rep-tab-btn" data-cat="musicians" onclick="setRepertoireTab('musicians')">Hudba</button>
+                    <button class="rep-tab-btn" data-cat="editors" onclick="setRepertoireTab('editors')">Střih</button>
+                    <button class="rep-tab-btn" data-cat="actors" onclick="setRepertoireTab('actors')">Herci</button>
+                    <button class="rep-tab-btn" data-cat="movies" onclick="setRepertoireTab('movies')">Filmy</button>
+                    <button class="rep-tab-btn" data-cat="series" onclick="setRepertoireTab('series')">Seriály</button>
+                </div>
+
                 <div id="repertoire-list" class="repertoire-container"></div>
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Externí Skripty -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
-    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/standalone/umd/vis-network.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
