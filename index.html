@@ -187,6 +187,7 @@
             map.on('moveend', rotateGlobe);
             rotateGlobe();
 
+            // Trik pro správnou inicializaci timeline - na chvíli zviditelníme kontejner
             document.getElementById('timeline-view').style.display = 'block';
             timeline = new vis.Timeline(document.getElementById('timeline-container'), timelineItems, timelineGroups, {
                 start: '1960-01-01', end: '2030-01-01', height: '100%', margin: { item: 10 }
@@ -253,11 +254,13 @@
                 const creditRes = await fetch(`https://api.themoviedb.org/3/person/${personId}/movie_credits?api_key=${TMDB_API_KEY}`);
                 const creditData = await creditRes.json();
 
+                // Sort: NEJNOVĚJŠÍ PRVNÍ (Descending)
                 let directedMovies = creditData.crew.filter(c => c.job === 'Director' && c.release_date);
                 directedMovies.sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
 
                 currentDirector = { id: detailData.id, name: detailData.name };
 
+                // Vykreslení UI - TADY BYLA CHYBA (\vert{}\vert{} místo ||)
                 document.getElementById('director-profile').style.display = 'flex';
                 document.getElementById('director-name').innerText = detailData.name;
                 document.getElementById('director-birth').innerText = `BORN: ${detailData.birthday \vert{}\vert{} 'UNKNOWN'}${detailData.deathday ? ' | DIED: '+detailData.deathday : ''}`;
@@ -270,6 +273,7 @@
 
                 renderFilmography(directedMovies);
                 
+                // Timeline for single director
                 timelineGroups.add({ id: detailData.id, content: detailData.name });
                 directedMovies.forEach(m => {
                     timelineItems.add({ id: m.id, group: detailData.id, content: m.title, start: m.release_date, type: 'point' });
@@ -279,6 +283,7 @@
 
                 document.getElementById('results-content').innerHTML = ``;
 
+                // Izolovaný try/catch pro geolokaci, aby nespadl zbytek, když selže Mapbox klíč
                 try {
                     if (detailData.place_of_birth) await geocodeAndPlot(detailData.place_of_birth, `${detailData.name} - Origin`);
                 } catch(e) { console.warn("Geocoding failed."); }
@@ -311,6 +316,7 @@
             } catch(e) { console.error(e); }
         }
 
+        // --- SROVNÁVACÍ REPERTOÁR MÓD ---
         async function compareRepertoire() {
             if (repertoire.length === 0) return alert("Repertoire is empty.");
             
