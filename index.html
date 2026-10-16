@@ -187,7 +187,6 @@
             map.on('moveend', rotateGlobe);
             rotateGlobe();
 
-            // Trik pro správnou inicializaci timeline - na chvíli zviditelníme kontejner
             document.getElementById('timeline-view').style.display = 'block';
             timeline = new vis.Timeline(document.getElementById('timeline-container'), timelineItems, timelineGroups, {
                 start: '1960-01-01', end: '2030-01-01', height: '100%', margin: { item: 10 }
@@ -259,7 +258,6 @@
 
                 currentDirector = { id: detailData.id, name: detailData.name };
 
-                // ZDE BYL PROBLÉM V PŮVODNÍM KÓDU - nyní je opraveno pomocí ||
                 document.getElementById('director-profile').style.display = 'flex';
                 document.getElementById('director-name').innerText = detailData.name;
                 document.getElementById('director-birth').innerText = `BORN: ${detailData.birthday \vert{}\vert{} 'UNKNOWN'}${detailData.deathday ? ' | DIED: '+detailData.deathday : ''}`;
@@ -313,7 +311,6 @@
             } catch(e) { console.error(e); }
         }
 
-        // --- SROVNÁVACÍ REPERTOÁR MÓD ---
         async function compareRepertoire() {
             if (repertoire.length === 0) return alert("Repertoire is empty.");
             
