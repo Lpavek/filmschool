@@ -35,14 +35,22 @@ h2 { margin: 0; font-weight: 900; letter-spacing: 3px; font-size: 17px; }
 
 .controls, .view-toggles, .search-container { display: flex; gap: 12px; align-items: center; }
 
-/* Glow Control Slider */
+/* Glow Control Slider - Positioned in Bottom Left Corner of Map */
 .glow-control {
-    display: flex; align-items: center; gap: 8px; background: #0c0c14;
-    border: 1px solid var(--border); padding: 4px 10px; border-radius: 4px;
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 10;
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(12, 12, 20, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 4px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
 }
 .glow-label { font-size: 10px; font-weight: 800; color: var(--neon-blue); letter-spacing: 1px; }
 .glow-control input[type="range"] {
-    width: 75px; accent-color: var(--neon-blue); cursor: pointer; height: 4px;
+    width: 80px; accent-color: var(--neon-blue); cursor: pointer; height: 4px;
 }
 
 .view-toggles button, .action-btn {
@@ -165,14 +173,17 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 .fin-bar-fill-budget { background: var(--neon-orange); height: 100%; border-radius: 4px; }
 .fin-bar-fill-revenue { background: var(--neon-green); height: 100%; border-radius: 4px; }
 
-/* Filmography List & Sort Toggle */
-.sort-toggle-btn { background: none; border: 1px solid #334155; color: #94a3b8; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; border-radius: 3px; transition: all 0.2s; }
-.sort-toggle-btn:hover { border-color: var(--neon-blue); color: var(--neon-blue); }
+/* Filmography List & Upcoming Film Styles */
+.sort-toggle-btn { background: none; border: 1px solid #334155; color: #94a3b8; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; border-radius: 3px; transition: all 0.2s; display: flex; align-items: center; gap: 4px; }
+.sort-toggle-btn:hover, .sort-toggle-btn.active { border-color: var(--neon-blue); color: var(--neon-blue); background: rgba(92, 92, 255, 0.1); }
 
 .list-container { font-size: 11px; color: #cbd5e1; }
 .film-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid #14141f; transition: background 0.2s; }
 .film-item:hover { background: #12121a; }
 .film-item.highlighted-film { background: rgba(92, 92, 255, 0.18); border-left: 3px solid var(--neon-blue); }
+.film-item.upcoming-film { color: #64748b; background: rgba(15, 15, 25, 0.5); }
+.upcoming-badge { font-size: 9px; font-weight: 800; color: #a855f7; border: 1px solid #a855f7; padding: 1px 4px; border-radius: 2px; text-transform: uppercase; margin-left: 6px; }
+
 .film-info { flex: 1; display: flex; gap: 10px; align-items: center; }
 .film-year { color: var(--neon-orange); font-weight: 700; cursor: pointer; width: 38px; }
 .film-title { cursor: pointer; font-weight: 600; color: var(--text-main); }
@@ -215,10 +226,11 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 /* Custom Markers */
 .custom-marker { background-color: var(--neon-orange); width: 10px; height: 10px; border-radius: 50%; border: 2px solid #000; cursor: pointer; box-shadow: 0 0 12px var(--neon-orange); }
 
-/* Vis Timeline Overrides */
+/* Vis Timeline Overrides & Upcoming Nodes */
 .vis-timeline { border: none !important; background: transparent; }
 .vis-item { background-color: #0f0f1a !important; border: 1px solid var(--neon-blue) !important; color: var(--text-main) !important; font-size: 10px; font-family: inherit; }
 .vis-item.vis-selected { border-color: var(--neon-orange) !important; background-color: rgba(255, 102, 0, 0.2) !important; color: #fff !important; }
+.vis-item.upcoming-node { background-color: rgba(168, 85, 247, 0.15) !important; border: 1px dashed #a855f7 !important; color: #e9d5ff !important; }
 .vis-time-axis .vis-text { color: #64748b !important; font-size: 10px; }
 .vis-panel.vis-background, .vis-panel.vis-bottom, .vis-panel.vis-left, .vis-panel.vis-right, .vis-panel.vis-top { border-color: #1e1e2e !important; }
 .vis-minor, .vis-major { border-color: #1e1e2e !important; }
