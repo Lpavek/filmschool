@@ -25,12 +25,6 @@
                 <button id="btn-timeline" onclick="switchView('timeline')">TIMELINE</button>
             </div>
 
-            <!-- Atmosphere Glow Intensity Slider -->
-            <div class="glow-control">
-                <span class="glow-label">GLOW</span>
-                <input type="range" id="glowSlider" min="0" max="100" value="50" oninput="updateGlobeGlow(this.value)">
-            </div>
-
             <div class="search-container">
                 <input type="text" id="searchInput" placeholder="SEARCH CREATOR OR MOVIE..." onkeypress="handleEnter(event)">
                 <button class="action-btn" onclick="searchAction()">SEARCH</button>
@@ -46,6 +40,12 @@
                 <h3 class="neon-text" id="timeline-title">GLOBAL TIMELINE</h3>
                 <div id="timeline-container"></div>
             </div>
+
+            <!-- Atmosphere Glow Intensity Slider (Moved to Bottom-Left Corner) -->
+            <div class="glow-control">
+                <span class="glow-label">GLOW</span>
+                <input type="range" id="glowSlider" min="0" max="100" value="50" oninput="updateGlobeGlow(this.value)">
+            </div>
             
             <!-- Left Sub-Inspector Panel -->
             <div id="sub-inspector-panel" class="sub-panel" style="display: none;">
@@ -59,7 +59,7 @@
             </div>
         </div>
 
-        <!-- Vertical Resizer Bar (Left / Right Panel Splitter) -->
+        <!-- Vertical Resizer Bar -->
         <div id="resizer"></div>
 
         <!-- Data Panel (Right) -->
@@ -107,16 +107,21 @@
                 <div class="section" id="filmography-section" style="display:none;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <h3 id="filmography-title" style="margin-bottom:0;">FILMOGRAPHY</h3>
-                        <button class="sort-toggle-btn" id="filmography-sort-btn" onclick="toggleFilmographySort()" title="Toggle Order">
-                            <span>NEWEST FIRST</span> ↕
-                        </button>
+                        <div style="display:flex; gap:6px;">
+                            <button class="sort-toggle-btn" id="upcoming-toggle-btn" onclick="toggleUpcoming()" title="Toggle Planned / Future Movies">
+                                🔮 <span>SHOW FUTURE</span>
+                            </button>
+                            <button class="sort-toggle-btn" id="filmography-sort-btn" onclick="toggleFilmographySort()" title="Toggle Order">
+                                <span>NEWEST FIRST</span> ↕
+                            </button>
+                        </div>
                     </div>
                     <div id="filmography-list" class="list-container"></div>
                 </div>
 
             </div>
 
-            <!-- Horizontal Resizer Bar (Top / Bottom Repertoire Splitter) -->
+            <!-- Horizontal Resizer Bar -->
             <div id="resizer-h"></div>
 
             <!-- Locked Bottom Repertoire Section -->
@@ -124,6 +129,11 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <h3 style="margin-bottom:0;">MY REPERTOIRE</h3>
                     <div class="repertoire-filters">
+                        <select id="filter-tab-sort" onchange="changeTabSortMode(this.value)" title="Sort Repertoire Categories">
+                            <option value="recent">TABS: RECENT</option>
+                            <option value="count">TABS: COUNT</option>
+                            <option value="default">TABS: DEFAULT</option>
+                        </select>
                         <select id="filter-visibility" onchange="renderRepertoire()">
                             <option value="main">ACTIVE</option>
                             <option value="hidden">HIDDEN</option>
@@ -139,16 +149,7 @@
 
                 <!-- Repertoire Category Tabs -->
                 <div class="rep-tabs-wrapper">
-                    <div class="rep-tabs" id="rep-tabs">
-                        <button class="rep-tab-btn active" data-cat="directors" onclick="setRepertoireTab('directors')">DIRECTING</button>
-                        <button class="rep-tab-btn" data-cat="writers" onclick="setRepertoireTab('writers')">SCREENPLAY</button>
-                        <button class="rep-tab-btn" data-cat="cinematographers" onclick="setRepertoireTab('cinematographers')">CAMERA</button>
-                        <button class="rep-tab-btn" data-cat="musicians" onclick="setRepertoireTab('musicians')">MUSIC</button>
-                        <button class="rep-tab-btn" data-cat="editors" onclick="setRepertoireTab('editors')">EDITING</button>
-                        <button class="rep-tab-btn" data-cat="actors" onclick="setRepertoireTab('actors')">ACTING</button>
-                        <button class="rep-tab-btn" data-cat="movies" onclick="setRepertoireTab('movies')">MOVIES</button>
-                        <button class="rep-tab-btn" data-cat="series" onclick="setRepertoireTab('series')">SERIES</button>
-                    </div>
+                    <div class="rep-tabs" id="rep-tabs"></div>
                 </div>
 
                 <div id="repertoire-list" class="repertoire-container"></div>
