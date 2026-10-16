@@ -94,7 +94,7 @@ input[type="text"]:focus { box-shadow: 0 0 8px rgba(92, 92, 255, 0.5); }
 }
 #resizer-h:hover, #resizer-h.dragging { background: var(--neon-blue); }
 
-/* Data Panel (Right - Unconstrained Max Width) */
+/* Data Panel (Right) */
 #data-panel {
     width: 42%; min-width: 250px;
     display: flex; flex-direction: column;
@@ -195,10 +195,11 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
     background: transparent; border: none; border-bottom: 2px solid transparent;
     color: #64748b; padding: 5px 10px; font-size: 10px; font-weight: 700;
     cursor: pointer; text-transform: uppercase; white-space: nowrap; transition: all 0.2s;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;
 }
 .rep-tab-btn.active { color: var(--neon-blue); border-bottom-color: var(--neon-blue); }
 .rep-tab-btn:hover:not(.active) { color: #cbd5e1; }
+.tab-count { font-size: 9px; opacity: 0.65; color: var(--neon-orange); }
 
 .repertoire-container { flex: 1; overflow-y: auto; }
 .repertoire-filters { display: flex; gap: 6px; }
