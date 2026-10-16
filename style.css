@@ -35,7 +35,7 @@ h2 { margin: 0; font-weight: 900; letter-spacing: 3px; font-size: 17px; }
 
 .controls, .view-toggles, .search-container { display: flex; gap: 12px; align-items: center; }
 
-/* Glow Control Slider - Centered at the bottom of map without overlapping Mapbox logo */
+/* Glow Control Slider */
 .glow-control {
     position: absolute;
     bottom: 18px;
@@ -110,10 +110,7 @@ input[type="text"]:focus { box-shadow: 0 0 8px rgba(92, 92, 255, 0.5); }
     background-color: var(--panel-bg); overflow: hidden;
 }
 
-/* Scrollable Top Container for Analyses */
-#data-scroll-container {
-    flex: 1; overflow-y: auto;
-}
+#data-scroll-container { flex: 1; overflow-y: auto; }
 
 /* Locked Bottom Repertoire Section */
 #repertoire-section {
@@ -125,13 +122,11 @@ input[type="text"]:focus { box-shadow: 0 0 8px rgba(92, 92, 255, 0.5); }
 .section { padding: 14px 18px; border-bottom: 1px solid #151520; }
 h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bottom: 1px solid rgba(255,102,0,0.3); padding-bottom: 6px; text-transform: uppercase; font-size: 12px; font-weight: 800; }
 
-/* Profile Setup & Improved Typography */
 .profile-header { display: flex; gap: 14px; margin-top: 10px; }
 #entity-photo { width: 105px; height: 155px; object-fit: cover; border: 1px solid var(--border); border-radius: 4px; }
 .profile-info { flex: 1; }
 #entity-name { margin: 0 0 8px 0; font-size: 16px; }
 
-/* Enhanced Readability for Year, Runtime, Genres */
 .bio-text-details {
     font-size: 13px;
     color: #e2e8f0;
@@ -153,7 +148,7 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 
 .profile-actions-bar { display: flex; gap: 6px; align-items: center; }
 
-/* Left Sub-Inspector Panel */
+/* Sub-Inspector Panel */
 .sub-panel {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(9, 9, 11, 0.96); backdrop-filter: blur(10px);
@@ -165,7 +160,7 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 .close-btn { background: none; border: 1px solid #334155; color: #94a3b8; cursor: pointer; padding: 4px; border-radius: 3px; display: flex; align-items: center; }
 .close-btn:hover { border-color: var(--neon-orange); color: var(--neon-orange); }
 
-/* Cast & Crew Typography Styling */
+/* Cast & Crew */
 .creators-grid { display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
 .creator-group { background: #0c0c12; border: 1px solid #1e1e2d; padding: 10px 12px; border-radius: 4px; }
 .creator-role-title { color: var(--neon-orange); font-weight: 800; text-transform: uppercase; font-size: 10px; margin-bottom: 6px; letter-spacing: 1px; }
@@ -192,34 +187,84 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 .fin-bar-fill-budget { background: var(--neon-orange); height: 100%; border-radius: 4px; }
 .fin-bar-fill-revenue { background: var(--neon-green); height: 100%; border-radius: 4px; }
 
-/* Filmography List & Upcoming Film Styles */
+/* Discrete Future / Upcoming Toggle Button */
+.discrete-future-btn {
+    background: transparent;
+    border: 1px solid #27273a;
+    color: #475569;
+    padding: 4px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.discrete-future-btn:hover, .discrete-future-btn.active {
+    color: #94a3b8;
+    border-color: #64748b;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Discrete Subtle Grey Upcoming Film Items */
+.film-item.upcoming-film {
+    color: #475569 !important;
+    background: rgba(8, 8, 12, 0.5);
+}
+.film-item.upcoming-film .film-title,
+.film-item.upcoming-film .film-year {
+    color: #64748b !important;
+}
+.film-item.upcoming-film:hover {
+    background: rgba(18, 18, 26, 0.6);
+}
+.upcoming-badge-subtle {
+    font-size: 8px;
+    font-weight: 700;
+    color: #475569;
+    border: 1px solid #27273a;
+    padding: 1px 4px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    margin-left: 6px;
+}
+
 .sort-toggle-btn { background: none; border: 1px solid #334155; color: #94a3b8; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; border-radius: 3px; transition: all 0.2s; display: flex; align-items: center; gap: 4px; }
-.sort-toggle-btn:hover, .sort-toggle-btn.active { border-color: var(--neon-blue); color: var(--neon-blue); background: rgba(92, 92, 255, 0.1); }
+.sort-toggle-btn:hover { border-color: var(--neon-blue); color: var(--neon-blue); }
 
 .list-container { font-size: 11px; color: #cbd5e1; }
 .film-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid #14141f; transition: background 0.2s; }
 .film-item:hover { background: #12121a; }
 .film-item.highlighted-film { background: rgba(92, 92, 255, 0.18); border-left: 3px solid var(--neon-blue); }
-.film-item.upcoming-film { color: #64748b; background: rgba(15, 15, 25, 0.5); }
-.upcoming-badge { font-size: 9px; font-weight: 800; color: #a855f7; border: 1px solid #a855f7; padding: 1px 4px; border-radius: 2px; text-transform: uppercase; margin-left: 6px; }
 
 .film-info { flex: 1; display: flex; gap: 10px; align-items: center; }
 .film-year { color: var(--neon-orange); font-weight: 700; cursor: pointer; width: 38px; }
 .film-title { cursor: pointer; font-weight: 600; color: var(--text-main); }
 .film-title:hover { color: var(--neon-blue); }
 
-/* SVG Action Buttons */
 .film-actions { display: flex; gap: 6px; align-items: center; }
 .btn-icon { background: #000; border: 1px solid #334155; color: #64748b; width: 26px; height: 26px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .btn-icon:hover { border-color: #94a3b8; color: #fff; }
 .btn-icon.active-seen { background: rgba(16, 185, 129, 0.15); border-color: var(--neon-green); color: var(--neon-green); }
-.btn-icon.active-wish { background: rgba(255, 215, 0, 0.15); border-color: var(--neon-yellow); color: var(--neon-yellow); }
+.btn-icon.active-wish { background: rgba(255, 215, 0, 0.18); border-color: var(--neon-yellow); color: var(--neon-yellow); box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
 .btn-icon.active-pinned { color: var(--neon-yellow); border-color: var(--neon-yellow); background: rgba(255, 215, 0, 0.12); }
 .btn-icon.imdb-link { border-color: transparent; color: #f5c518; text-decoration: none; }
 
-/* Repertoire Category Tabs */
+/* Repertoire Header & Wishlist Drawer Trigger */
+.repertoire-filters-wrapper { display: flex; gap: 8px; align-items: center; }
+.repertoire-filters { display: flex; gap: 6px; }
+.repertoire-filters select { background: #000; color: var(--text-main); border: 1px solid #334155; padding: 2px 5px; font-size: 9px; font-weight: 600; outline: none; border-radius: 3px; }
+
+/* Repertoire Category Tabs with Smooth Wheel Scroll */
 .rep-tabs-wrapper { position: relative; margin-bottom: 6px; border-bottom: 1px solid #1e1e2e; flex-shrink: 0; }
-.rep-tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding-bottom: 2px; }
+.rep-tabs {
+    display: flex; gap: 2px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 2px;
+}
 .rep-tabs::-webkit-scrollbar { display: none; }
 .rep-tab-btn {
     background: transparent; border: none; border-bottom: 2px solid transparent;
@@ -231,12 +276,48 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 .rep-tab-btn:hover:not(.active) { color: #cbd5e1; }
 .tab-count { font-size: 9px; opacity: 0.65; color: var(--neon-orange); }
 
+/* Repertoire Split Screen Container */
+.repertoire-split-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+    position: relative;
+}
+.rep-main-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Wishlist Slide-Over / Split Screen Column */
+.rep-wishlist-col {
+    width: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.25s ease-out;
+    border-left: 1px solid #1a1a2b;
+    background: #08080f;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.rep-wishlist-col.open {
+    width: 48%;
+    opacity: 1;
+    visibility: visible;
+    padding-left: 8px;
+}
+.wishlist-header {
+    font-size: 10px; font-weight: 800; color: var(--neon-yellow);
+    letter-spacing: 1px; padding: 4px 0; border-bottom: 1px solid #1e1e2e;
+    margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;
+}
+
 .repertoire-container { flex: 1; overflow-y: auto; }
-.repertoire-filters { display: flex; gap: 6px; }
-.repertoire-filters select { background: #000; color: var(--text-main); border: 1px solid #334155; padding: 2px 5px; font-size: 9px; font-weight: 600; outline: none; border-radius: 3px; }
 .repertoire-item { background: #0e0e16; border-left: 4px solid var(--purple-low); margin-bottom: 4px; padding: 5px 8px; display: flex; justify-content: space-between; align-items: center; position: relative; border-radius: 0 3px 3px 0; }
 .repertoire-item.pinned { border-top: 1px solid rgba(255, 215, 0, 0.3); }
-.repertoire-item.wishlist-item { border-right: 2px solid var(--neon-yellow); }
 .repertoire-item.hidden-item { opacity: 0.45; }
 .rep-info { display: flex; flex-direction: column; cursor: pointer; }
 .rep-name { font-weight: 700; font-size: 11px; color: var(--text-main); }
@@ -246,12 +327,57 @@ h3 { color: var(--neon-orange); margin-top: 0; letter-spacing: 1.5px; border-bot
 /* Custom Markers */
 .custom-marker { background-color: var(--neon-orange); width: 10px; height: 10px; border-radius: 50%; border: 2px solid #000; cursor: pointer; box-shadow: 0 0 12px var(--neon-orange); }
 
-/* Vis Timeline Overrides & Upcoming Nodes */
+/* --- ENHANCED VIS TIMELINE STYLING --- */
 .vis-timeline { border: none !important; background: transparent; }
-.vis-item { background-color: #0f0f1a !important; border: 1px solid var(--neon-blue) !important; color: var(--text-main) !important; font-size: 10px; font-family: inherit; }
-.vis-item.vis-selected { border-color: var(--neon-orange) !important; background-color: rgba(255, 102, 0, 0.2) !important; color: #fff !important; }
-.vis-item.upcoming-node { background-color: rgba(168, 85, 247, 0.15) !important; border: 1px dashed #a855f7 !important; color: #e9d5ff !important; }
-.vis-time-axis .vis-text { color: #64748b !important; font-size: 10px; }
+.vis-item {
+    background-color: #0d0d16 !important;
+    border: 1px solid var(--neon-blue) !important;
+    color: var(--text-main) !important;
+    font-size: 11px !important;
+    font-family: inherit;
+    border-radius: 4px !important;
+    padding: 3px 8px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    transition: all 0.2s ease;
+}
+.vis-item:hover {
+    border-color: #ffffff !important;
+    background-color: #1a1a2b !important;
+    z-index: 99 !important;
+    cursor: pointer;
+}
+.vis-item.vis-selected {
+    border-color: var(--neon-orange) !important;
+    background-color: rgba(255, 102, 0, 0.25) !important;
+    color: #fff !important;
+}
+
+/* Active Highlighted Film Glow Node */
+.vis-item.active-timeline-node {
+    border: 2px solid var(--neon-orange) !important;
+    background: rgba(255, 102, 0, 0.35) !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 14px rgba(255, 102, 0, 0.8) !important;
+    font-weight: 700 !important;
+    z-index: 100 !important;
+}
+
+/* Discrete Grey Upcoming Node for Timeline */
+.vis-item.upcoming-node {
+    background-color: rgba(30, 30, 45, 0.4) !important;
+    border: 1px dashed #475569 !important;
+    color: #64748b !important;
+}
+
+.tl-title { font-weight: 600; }
+.tl-year { color: var(--neon-orange); font-size: 10px; font-weight: 700; margin-left: 3px; }
+.vis-item.upcoming-node .tl-year { color: #64748b !important; }
+
+/* Subtle Stem & Dot Styling */
+.vis-item.vis-line { border-left: 1px solid rgba(92, 92, 255, 0.35) !important; }
+.vis-item.vis-dot { border-color: var(--neon-blue) !important; background-color: var(--neon-orange) !important; }
+
+.vis-time-axis .vis-text { color: #64748b !important; font-size: 10px; font-weight: 700; }
 .vis-panel.vis-background, .vis-panel.vis-bottom, .vis-panel.vis-left, .vis-panel.vis-right, .vis-panel.vis-top { border-color: #1e1e2e !important; }
 .vis-minor, .vis-major { border-color: #1e1e2e !important; }
 
